@@ -25,7 +25,8 @@ and Colombo. Search by station, state or country.
 | **Pacific detail** | Official Niño-box departures + live 30-day SST curves for all four boxes | NOAA CPC + Open-Meteo Marine | weekly / hourly |
 | **Briefing** | Plain-language seasonal read-out in English plus eight Indian languages | written here, translated by Sarvam | static per ENSO update |
 | **Water** | Soil-water balance (rain − evaporation) and river discharge per station | Open-Meteo + GloFAS | 30-day window |
-| **Air** | 10 m wind speed, direction and prevailing flow | Open-Meteo (ECMWF) | hourly |
+| **Underground water** | Volumetric water content at four depths (0–7, 7–28, 28–100, 100–255 cm) per station — the soil column recharge moves through | Open-Meteo (ERA5 land) | daily |
+| **Air** | 10 m wind, humidity, PM2.5 and satellite aerosol optical depth | Open-Meteo + CAMS | hourly |
 | **Verification** | Each station's modelled rain checked against the satellite pixel above it, plus five pipeline self-tests | IMERG pixels + internal | per poll |
 | **Data** | Feed inventory, backend status, feedback form | — | — |
 
