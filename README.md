@@ -1,10 +1,13 @@
-# ENI · El Niño / India Climate Watch
+# ENI · India Climate & Water Watch
 
-A live climate console for **India and its immediate neighbourhood**: the current state of
-El Niño, what it is doing to rainfall and heat over the subcontinent, what the satellite saw,
-and where the climate is heading. Every panel is fed by an open, verifiable source; the
+A live climate and water console for **every state and union territory of India** plus its
+neighbourhood: rainfall, heat, groundwater recharge, river flow, wind, satellite imagery, the
+state of El Niño, and where the climate is heading. Every panel is fed by an open, verifiable source; the
 reference data (stations, IMD thresholds, the ENSO record) lives in Supabase so it can be
 edited without touching code.
+
+**Coverage:** 42 stations — all 28 states, all 8 union territories, plus Karachi, Dhaka, Kathmandu
+and Colombo. Search by station, state or country.
 
 **Live site:** https://arvarunram-byte.github.io/el-nino-india-watch/
 
@@ -21,6 +24,8 @@ edited without touching code.
 | **Climate change** | CMIP6 1961–2050 warming rate, anomaly vs 1961–90, projected 2046–50, rainfall change | Open-Meteo Climate | static archive |
 | **Pacific detail** | Official Niño-box departures + live 30-day SST curves for all four boxes | NOAA CPC + Open-Meteo Marine | weekly / hourly |
 | **Briefing** | Plain-language seasonal read-out in English plus eight Indian languages | written here, translated by Sarvam | static per ENSO update |
+| **Water** | Soil-water balance (rain − evaporation) and river discharge per station | Open-Meteo + GloFAS | 30-day window |
+| **Air** | 10 m wind speed, direction and prevailing flow | Open-Meteo (ECMWF) | hourly |
 | **Verification** | Each station's modelled rain checked against the satellite pixel above it, plus five pipeline self-tests | IMERG pixels + internal | per poll |
 | **Data** | Feed inventory, backend status, feedback form | — | — |
 
