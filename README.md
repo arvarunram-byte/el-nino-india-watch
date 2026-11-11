@@ -196,9 +196,21 @@ Region filters and the station drawer are also linkable: `?region=south`.
 - **NOAA Climate Prediction Center** — RONI, Niño departures, ENSO alert status and outlook.
 - **Browserbase** — used to fetch the deployed page from outside the build environment, as an
   external check that the published site serves what the repository contains.
-- **Sarvam** — translation of the briefing into Hindi, Bengali, Marathi, Gujarati, Tamil, Telugu,
-  Kannada and Malayalam. The English text is written for this console from the CPC record; the
-  translations say the same thing and carry the same caveat.
+- **Sarvam** — translation of the briefing into eight Indian languages, and transliteration of all
+  42 station names into Devanagari, Bengali and Tamil so that `कोलकाता`, `কলকাতা` or `கொல்கத்தா`
+  find Kolkata. The English text is written for this console from the CPC record; the translations
+  say the same thing and carry the same caveat.
+
+### Listening, not just reading
+
+The briefing has a **Listen** button that speaks the current language out loud, and a **Copy digest**
+button that puts the briefing plus today's rain, heat, water and wind figures on the clipboard as a
+plain-text summary — ready to paste into Slack, mail or WhatsApp.
+
+The voice is the device's own speech engine (`speechSynthesis`), chosen by language tag. It is not
+Sarvam TTS: no text-to-speech endpoint is wired into this build. The interface says so rather than
+implying otherwise, and the call is a single function — swap `speakBriefing()` for a Sarvam TTS call
+when a key is available and the rest of the page needs no change.
 - **India Meteorological Department** — heat-wave thresholds and 24-hour rainfall categories.
 
 Figures quoted in the interface are dated and attributed where they are shown. Nothing in this
