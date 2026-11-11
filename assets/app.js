@@ -86,12 +86,22 @@
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
 
-  function showFatal(msg) {
+  function showFatal(msg, where) {
     var f = document.getElementById("fatal");
     if (!f) return;
+    if (f.dataset.seen === String(msg)) return;
+    f.dataset.seen = String(msg);
     f.hidden = false;
-    f.textContent = "Something failed: " + String(msg).slice(0, 160)
-      + " — pull down to hard-reload. If it repeats, your network may be blocking the data feeds.";
+    f.textContent = "Bug in this page: " + String(msg).slice(0, 120)
+      + (where ? "  [" + where + "]" : "") + " — tell me this line and I will fix it.";
+  }
+
+  function whereFrom(err) {
+    try {
+      var stack = (err && err.stack) || "";
+      var m = /app\.js[^\s)]*:(\d+)/.exec(stack);
+      return m ? "app.js line " + m[1] : "";
+    } catch (e) { return ""; }
   }
 
   function toast(msg) {
@@ -1307,6 +1317,10 @@
     function close() { box.hidden = true; box.innerHTML = ""; }
 
     function render(q) {
+      try { renderHits(q); } catch (e) { close(); }
+    }
+
+    function renderHits(q) {
       q = String(q || "").trim().toLowerCase();
       if (!q) { close(); return; }
       var raw = String(q || "").trim();
@@ -1968,8 +1982,9 @@
     });
 
     var badOrder = rows.filter(function (r) {
-      for (var i = 0; i < r.tmax.length; i++) {
-        if (isFinite(r.tmax[i]) && isFinite(r.tmin[i]) && r.tmax[i] < r.tmin[i]) return true;
+      var tmax = r.tmax || [], tmin = r.tmin || [];
+      for (var i = 0; i < tmax.length; i++) {
+        if (isFinite(tmax[i]) && isFinite(tmin[i]) && tmax[i] < tmin[i]) return true;
       }
       return false;
     });
@@ -1980,6 +1995,7 @@
     });
 
     var badSum = rows.filter(function (r) {
+      if (!r.precip || r.precip.length < 93) return true;
       var recomputed = sum(r.precip.slice(86, 93));
       return Math.abs(recomputed - r.p7) > 0.05;
     });
@@ -2225,11 +2241,14 @@
         store.set("eni.lastRows", { at: Date.now(), region: state.region, rows: slim(state.rows) });
 
         var rows = filtered();
-        renderAlerts(rows);
-        renderRain(rows);
-        renderHeat(rows);
-        renderAir(rows);
-        renderMap();
+        var step = function (fn, name) {
+          try { fn(); } catch (e) { showFatal(name + ": " + e.message, whereFrom(e)); }
+        };
+        step(function () { renderAlerts(rows); }, "alerts");
+        step(function () { renderRain(rows); }, "rainfall");
+        step(function () { renderHeat(rows); }, "heat");
+        step(function () { renderAir(rows); }, "air");
+        step(function () { renderMap(); }, "map");
         setText("stationCount", rows.length + " of " + state.rows.length + " stations");
         if (initial || state.cycle % 5 === 1) runVerification();
         if (initial || state.cycle % 5 === 1) {
@@ -2410,9 +2429,9 @@
     wireSearch();
     wireTable();
     wireFeedback();
-    window.addEventListener("error", function (e) { showFatal(e.message); });
+    window.addEventListener("error", function (e) { showFatal(e.message, whereFrom(e.error)); });
     window.addEventListener("unhandledrejection", function (e) {
-      showFatal((e.reason && e.reason.message) || e.reason);
+      showFatal((e.reason && e.reason.message) || e.reason, whereFrom(e.reason));
     });
 
     setTimeout(function () {
