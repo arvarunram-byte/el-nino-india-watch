@@ -151,6 +151,7 @@ code, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .dot--rain { color: var(--rain); } .dot--heat { color: var(--heat); }
 .dot--enso { color: var(--enso); } .dot--climate { color: var(--climate); }
 .dot--map { color: var(--rain); } .dot--dim { color: var(--faint); }
+.dot--brief { color: var(--climate); }
 @keyframes beat { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
 
 .ring {
@@ -199,7 +200,7 @@ main {
   display: grid; grid-template-columns: repeat(12, minmax(0,1fr));
   gap: 16px; align-items: start;
 }
-.hero, .alerts, #p-map, #p-data { grid-column: span 12; }
+.hero, .alerts, #p-map, #p-brief, #p-data { grid-column: span 12; }
 #p-rain, #p-climate { grid-column: span 7; }
 #p-heat, #p-pacific { grid-column: span 5; }
 
@@ -455,7 +456,10 @@ main {
   border-radius: var(--r-md); overflow: hidden;
 }
 #mapTiles { position: relative; width: 100%; height: clamp(400px, 44vw, 660px); overflow: hidden; background: var(--map-bg); }
-#mapTiles img { position: absolute; width: 256px; height: 256px; pointer-events: none; user-select: none; }
+#mapBase, #mapFrames { position: absolute; inset: 0; }
+.frame { position: absolute; inset: 0; opacity: 0; transition: opacity .28s linear; pointer-events: none; }
+.frame.is-on { opacity: 1; }
+#mapTiles img { position: absolute; pointer-events: none; user-select: none; }
 #mapSvg { position: absolute; inset: 0; width: 100%; height: 100%; }
 #mapSvg circle[data-station] { pointer-events: auto; cursor: pointer; }
 .map-hud {
@@ -576,6 +580,73 @@ html[data-theme="light"] .btn { color: #fff; }
 .loading { font-family: var(--mono); font-size: 11px; color: var(--faint); padding: 10px 2px; }
 .err { color: var(--heat); }
 
+/* ── segmented control ──────────────────────────────────────────────────── */
+.seg {
+  display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-2); background: var(--surface-2);
+}
+.seg button {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  padding: 5px 11px; border: 0; border-radius: 4px; background: transparent;
+  color: var(--faint); cursor: pointer; transition: .15s; white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 500; }
+html[data-theme="light"] .seg button[aria-pressed="true"] { background: #171a1e; color: #fff; }
+.seg--sm button { padding: 4px 8px; font-size: 9px; }
+
+/* ── satellite player ───────────────────────────────────────────────────── */
+.playbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-2); padding: 9px 12px;
+}
+.play {
+  display: grid; place-items: center; width: 30px; height: 30px; flex: none;
+  border-radius: 50%; border: 1px solid var(--rain); background: var(--rain);
+  color: var(--bg); cursor: pointer; transition: .15s;
+}
+html[data-theme="light"] .play { color: #fff; }
+.play:hover { filter: brightness(1.1); }
+.play[aria-pressed="true"] { background: var(--enso); border-color: var(--enso); }
+.play:focus-visible { outline: 2px solid var(--rain); outline-offset: 3px; }
+.scrub {
+  -webkit-appearance: none; appearance: none; flex: 1 1 200px; min-width: 120px;
+  height: 4px; border-radius: 2px; background: var(--surface-3); cursor: pointer;
+}
+.scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--rain); border: 2px solid var(--surface); cursor: grab;
+}
+.scrub::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%; background: var(--rain);
+  border: 2px solid var(--surface); cursor: grab;
+}
+.scrub:focus-visible { outline: 2px solid var(--rain); outline-offset: 4px; }
+.stamp { font-size: 10.5px; color: var(--text); letter-spacing: .04em; white-space: nowrap; min-width: 132px; }
+.loadstate { font-size: 9px; color: var(--faint); letter-spacing: .06em; white-space: nowrap; }
+
+/* ── briefing ───────────────────────────────────────────────────────────── */
+.langbar { display: flex; gap: 5px; flex-wrap: wrap; }
+.lang {
+  font-family: var(--sans); font-size: 12px; padding: 4px 11px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer;
+  transition: .15s; line-height: 1.5;
+}
+.lang:hover { color: var(--text); border-color: var(--border-2); }
+.lang[aria-pressed="true"] { background: var(--climate); border-color: var(--climate); color: #fff; font-weight: 500; }
+.brief {
+  margin: 0; padding: 2px 0 2px 18px; border-left: 2px solid color-mix(in srgb, var(--climate) 55%, transparent);
+  font-family: var(--display); font-size: clamp(18px, 1.9vw, 26px); line-height: 1.42;
+  letter-spacing: -.005em; color: var(--text); max-width: 92ch;
+}
+.brief p { margin: 0 0 .7em; }
+.brief p:last-child { margin-bottom: 0; }
+.brief__foot {
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .05em; color: var(--faint);
+}
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1340px) {
   .hero__grid { grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr); }
@@ -602,6 +673,10 @@ html[data-theme="light"] .btn { color: #fff; }
   .fig__s { display: none; }
   .panel__body { padding: 13px; }
   .periods { grid-template-columns: 1fr; }
+  .brief { font-size: 17px; padding-left: 13px; }
+  .playbar { gap: 9px; padding: 8px 10px; }
+  .stamp { min-width: 0; font-size: 10px; }
+  .loadstate { display: none; }
   .hrow { grid-template-columns: minmax(0,74px) minmax(0,1fr) 44px 44px; gap: 7px; }
 }
 @media (prefers-reduced-motion: reduce) {
