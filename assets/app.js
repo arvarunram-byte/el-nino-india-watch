@@ -30,6 +30,10 @@
     byId: {},
     layer: "precip",
     view: "india",
+    mapCenter: { india: { lat: 20.5, lon: 79.0 }, world: { lat: 12.0, lon: 0.0 } },
+    mapZoom: 1,
+    geom: null,
+    drag: null,
     span: 12,
     frame: 11,
     playing: false,
@@ -111,10 +115,13 @@
     var stationsP = sbGet("eni_stations?select=*&active=eq.true&order=sort_order.asc")
       .then(function (rows) {
         if (!Array.isArray(rows) || !rows.length) throw new Error("empty");
+        var localById = {};
+        REF.STATIONS.forEach(function (x) { localById[x.id] = x; });
         return rows.map(function (r) {
           return {
             id: r.id, name: r.name, country: r.country, region: r.region, zone: r.zone,
-            lat: +r.lat, lon: +r.lon, elevation_m: r.elevation_m
+            lat: +r.lat, lon: +r.lon, elevation_m: r.elevation_m,
+            state_name: r.state_name || (localById[r.id] ? localById[r.id].st : null)
           };
         });
       });
@@ -778,36 +785,38 @@
   var lonFromX = function (x) { return x * 360 - 180; };
   var GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best";
 
-  var VIEWS = {
-    india: { centerLat: 20.5, centerLon: 79.0 },
-    world: { centerLat: 12.0, centerLon: 0.0 }
-  };
+  var MAX_TILE_Z = 6;
 
-  // the map is derived from the box it has to fill, so it never letterboxes
-  function viewGeom(W, H) {
+  function baseGeom(W, H) {
     if (state.view === "world") {
       var wz = 3;
       var wWorld = 256 * Math.pow(2, wz);
-      var ws = W / wWorld;                       // globe fitted to the width
-      var wy = latNorm(VIEWS.world.centerLat) * wWorld - (H / ws) / 2;
-      return {
-        z: wz, s: ws, world: wWorld, xPix: 0, yPix: wy,
-        west: -180, east: 180,
-        north: latFromNorm(wy / wWorld),
-        south: latFromNorm((wy + H / ws) / wWorld)
-      };
+      return { z: wz, world: wWorld, s: W / wWorld };
     }
     var z = (H >= 600 && W >= 700) ? 5 : 4;
-    var world = 256 * Math.pow(2, z);
-    var nx = (VIEWS.india.centerLon + 180) / 360;
-    var ny = latNorm(VIEWS.india.centerLat);
-    var xLeft = nx - (W / world) / 2;
-    var yTop = ny - (H / world) / 2;
+    return { z: z, world: 256 * Math.pow(2, z), s: 1 };
+  }
+
+  // the view follows a movable centre and a zoom factor, so it can be dragged
+  function viewGeom(W, H) {
+    var b = baseGeom(W, H);
+    var s = b.s * state.mapZoom;
+    var c = state.mapCenter[state.view];
+    var xPix = (c.lon + 180) / 360 * b.world - (W / s) / 2;
+    var yPix = latNorm(c.lat) * b.world - (H / s) / 2;
+    var tz = clamp(Math.round(b.z + Math.log2(state.mapZoom)), b.z, MAX_TILE_Z);
     return {
-      z: z, s: 1, world: world, xPix: xLeft * world, yPix: yTop * world,
-      west: lonFromX(xLeft), east: lonFromX(xLeft + W / world),
-      north: latFromNorm(yTop), south: latFromNorm(yTop + H / world)
+      z: b.z, tz: tz, k: Math.pow(2, tz - b.z),
+      world: b.world, s: s, xPix: xPix, yPix: yPix,
+      west: lonFromX(xPix / b.world), east: lonFromX((xPix + W / s) / b.world),
+      north: latFromNorm(yPix / b.world), south: latFromNorm((yPix + H / s) / b.world)
     };
+  }
+
+  function commitCenter(W, H, g) {
+    var c = state.mapCenter[state.view];
+    c.lon = clamp(lonFromX((g.xPix + (W / g.s) / 2) / g.world), -180, 180);
+    c.lat = clamp(latFromNorm((g.yPix + (H / g.s) / 2) / g.world), -80, 80);
   }
 
   var LAYERS = {
@@ -855,25 +864,26 @@
 
   function tilesHTML(g, cfg, d, lazy) {
     var W = $("#mapTiles").clientWidth, H = $("#mapTiles").clientHeight;
+    var k = g.k || 1;
     var xPix = g.xPix, yPix = g.yPix;
-    var maxTile = Math.pow(2, g.z) - 1;
-    var tx0 = clamp(Math.floor(xPix / 256), 0, maxTile);
-    var tx1 = clamp(Math.floor((xPix + W / g.s) / 256), 0, maxTile);
-    var ty0 = clamp(Math.floor(yPix / 256), 0, maxTile);
-    var ty1 = clamp(Math.floor((yPix + H / g.s) / 256), 0, maxTile);
-    var size = (256 * g.s).toFixed(1);
+    var maxTile = Math.pow(2, g.tz) - 1;
+    var tx0 = clamp(Math.floor((xPix * k) / 256), 0, maxTile);
+    var tx1 = clamp(Math.floor(((xPix + W / g.s) * k) / 256), 0, maxTile);
+    var ty0 = clamp(Math.floor((yPix * k) / 256), 0, maxTile);
+    var ty1 = clamp(Math.floor(((yPix + H / g.s) * k) / 256), 0, maxTile);
+    var size = (256 / k * g.s).toFixed(1);
     var out = [];
 
     for (var ty = ty0; ty <= ty1; ty++) {
       for (var tx = tx0; tx <= tx1; tx++) {
-        var left = ((tx * 256 - xPix) * g.s).toFixed(1);
-        var top = ((ty * 256 - yPix) * g.s).toFixed(1);
+        var left = ((tx * 256 / k - xPix) * g.s).toFixed(1);
+        var top = ((ty * 256 / k - yPix) * g.s).toFixed(1);
         var geo = 'left:' + left + 'px;top:' + top + 'px;width:' + size + 'px;height:' + size + 'px';
         if (!cfg) {
-          out.push('<img src="' + GIBS + "/Coastlines/default/2020-01-01/GoogleMapsCompatible_Level9/" + g.z + "/" + ty + "/" + tx
+          out.push('<img src="' + GIBS + "/Coastlines/default/2020-01-01/GoogleMapsCompatible_Level9/" + g.tz + "/" + ty + "/" + tx
             + '.png" style="' + geo + ';opacity:.85;filter:invert(1) saturate(0) brightness(1.35)" alt="" loading="lazy">');
         } else {
-          var url = layerTileURL(cfg, Math.min(g.z, cfg.maxZ), ty, tx, d);
+          var url = layerTileURL(cfg, Math.min(g.tz, cfg.maxZ), ty, tx, d);
           out.push('<img ' + (lazy ? 'data-src="' + url + '"' : 'src="' + url + '"') + ' style="' + geo
             + ';opacity:' + cfg.opacity + '" alt="" onerror="this.style.display=\'none\'">');
         }
@@ -936,11 +946,11 @@
     var loaded = $$(".frame[data-loaded='1']").length;
     setText("loadState", state.playing ? "playing" : "frame " + (i + 1) + "/" + state.frames.length);
     var hud = $("#mapHud");
-    if (hud) {
-      hud.innerHTML = "SCENE <b>" + label + "</b> · Z" + (state.geom ? state.geom.z : "") + " · "
-        + LAYERS[state.layer].label.toUpperCase()
-        + "<br>" + (state.geom ? state.geom.west.toFixed(0) + "°E–" + state.geom.east.toFixed(0) + "°E · "
-          + state.geom.south.toFixed(0) + "°N–" + state.geom.north.toFixed(0) + "°N" : "");
+    if (hud && state.geom) {
+      var gg = state.geom;
+      hud.innerHTML = "<b>" + label + "</b> · Z" + gg.tz + " · "
+        + gg.west.toFixed(0) + "–" + gg.east.toFixed(0) + "°E "
+        + gg.south.toFixed(0) + "–" + gg.north.toFixed(0) + "°N";
     }
   }
 
@@ -1002,6 +1012,15 @@
       });
     }
 
+    var boxes = [];
+    function labelFits(x, y, w, h) {
+      for (var bi = 0; bi < boxes.length; bi++) {
+        var bb = boxes[bi];
+        if (x < bb.x + bb.w && x + w > bb.x && y < bb.y + bb.h && y + h > bb.y) return false;
+      }
+      return true;
+    }
+
     state.stations.forEach(function (c) {
       if (c.lon < g.west || c.lon > g.east || c.lat < g.south || c.lat > g.north) return;
       var cx = px(c.lon), cy = py(c.lat);
@@ -1017,10 +1036,18 @@
       g0 += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (r + 1.6) + '" fill="rgba(6,9,12,.6)" opacity="' + op + '"/>';
       g0 += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + r + '" fill="' + col + '" opacity="' + op
         + '" data-station="' + c.id + '"><title>' + esc(c.name) + "</title></circle>";
-      if (c.country === "IN" && !dim && state.view === "india") {
-        g0 += '<text x="' + (cx + 6).toFixed(1) + '" y="' + (cy + 3).toFixed(1)
-          + '" fill="rgba(232,238,244,.9)" font-family="JetBrains Mono, monospace" font-size="9"'
-          + ' style="paint-order:stroke;stroke:rgba(6,9,12,.85);stroke-width:2.6px">' + esc(c.name) + "</text>";
+      if (!dim) {
+        var label = c.name;
+        var wpx = label.length * 5.2 + 5, hpx = 11;
+        var lx = cx + 7, anchor = "start";
+        if (lx + wpx > W - 3) { lx = cx - 7; anchor = "end"; }
+        var bx = anchor === "end" ? lx - wpx : lx;
+        if (bx > 1 && bx + wpx < W - 1 && labelFits(bx, cy - 8, wpx, hpx)) {
+          boxes.push({ x: bx, y: cy - 8, w: wpx, h: hpx });
+          g0 += '<text x="' + lx.toFixed(1) + '" y="' + (cy + 3).toFixed(1) + '" text-anchor="' + anchor
+            + '" fill="rgba(232,238,244,.92)" font-family="JetBrains Mono, monospace" font-size="9"'
+            + ' style="paint-order:stroke;stroke:rgba(6,9,12,.9);stroke-width:2.8px">' + esc(label) + "</text>";
+        }
       }
     });
     svg.innerHTML = g0;
@@ -1127,6 +1154,182 @@
       b.setAttribute("aria-pressed", String(b.dataset.lang === code));
     });
     setText("briefAttrib", it.label + " · " + (it.translated ? "translated by Sarvam" : "written by Sarvam"));
+  }
+
+  /* ── map interaction: drag, pinch, wheel, buttons ────────────────────── */
+  var renderTimer = null;
+  function scheduleMapRender(delay) {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(renderMap, delay === undefined ? 90 : delay);
+  }
+
+  function zoomAt(sx, sy, factor) {
+    var host = $("#mapTiles");
+    if (!host || !state.geom) return;
+    var W = host.clientWidth, H = host.clientHeight;
+    var g = state.geom;
+    var anchorX = g.xPix + sx / g.s;
+    var anchorY = g.yPix + sy / g.s;
+    state.mapZoom = clamp(state.mapZoom * factor, 0.7, 8);
+    var b = baseGeom(W, H);
+    var s2 = b.s * state.mapZoom;
+    var c = state.mapCenter[state.view];
+    c.lon = clamp(lonFromX((anchorX - sx / s2 + (W / s2) / 2) / b.world), -180, 180);
+    c.lat = clamp(latFromNorm((anchorY - sy / s2 + (H / s2) / 2) / b.world), -80, 80);
+    scheduleMapRender(30);
+  }
+
+  function wireMap() {
+    var host = $("#mapTiles"), stage = $("#mapStage");
+    if (!host || !stage) return;
+
+    var pts = {}, mode = null, dist0 = 0, zoom0 = 1, dx0 = 0, dy0 = 0, moved = false;
+    var count = function () { return Object.keys(pts).length; };
+    function distance() {
+      var k = Object.keys(pts);
+      var a = pts[k[0]], b = pts[k[1]];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    host.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("circle[data-station]")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      try { host.setPointerCapture(e.pointerId); } catch (err) {}
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      moved = false;
+      if (count() === 2) { mode = "pinch"; dist0 = distance(); zoom0 = state.mapZoom; }
+      else { mode = "pan"; dx0 = 0; dy0 = 0; host.classList.add("is-dragging"); }
+    });
+
+    host.addEventListener("pointermove", function (e) {
+      if (!pts[e.pointerId]) return;
+      var prev = pts[e.pointerId];
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+      if (mode === "pinch" && count() === 2) {
+        var d = distance();
+        if (dist0 > 0) {
+          state.mapZoom = clamp(zoom0 * (d / dist0), 0.7, 8);
+          scheduleMapRender(140);
+        }
+        moved = true;
+        return;
+      }
+      if (mode !== "pan") return;
+      dx0 += e.clientX - prev.x;
+      dy0 += e.clientY - prev.y;
+      if (Math.abs(dx0) + Math.abs(dy0) > 3) moved = true;
+      stage.style.transform = "translate(" + dx0 + "px," + dy0 + "px)";
+    });
+
+    function end(e) {
+      if (!pts[e.pointerId]) return;
+      delete pts[e.pointerId];
+      if (count() > 0) return;
+      host.classList.remove("is-dragging");
+      if (mode === "pan" && moved && state.geom) {
+        var g = state.geom;
+        g.xPix -= dx0 / g.s;
+        g.yPix -= dy0 / g.s;
+        commitCenter(host.clientWidth, host.clientHeight, g);
+        scheduleMapRender(0);
+      }
+      stage.style.transform = "";
+      dx0 = 0; dy0 = 0; mode = null;
+    }
+    host.addEventListener("pointerup", end);
+    host.addEventListener("pointercancel", end);
+    host.addEventListener("pointerleave", function (e) { if (mode === "pan") end(e); });
+
+    host.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      var r = host.getBoundingClientRect();
+      zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.18 : 1 / 1.18);
+    }, { passive: false });
+
+    host.addEventListener("dblclick", function (e) {
+      var r = host.getBoundingClientRect();
+      zoomAt(e.clientX - r.left, e.clientY - r.top, 1.6);
+    });
+
+    $("#zoomIn").addEventListener("click", function () { zoomAt(host.clientWidth / 2, host.clientHeight / 2, 1.35); });
+    $("#zoomOut").addEventListener("click", function () { zoomAt(host.clientWidth / 2, host.clientHeight / 2, 1 / 1.35); });
+    $("#zoomReset").addEventListener("click", function () {
+      state.mapZoom = 1;
+      state.mapCenter[state.view] = state.view === "world" ? { lat: 12, lon: 0 } : { lat: 20.5, lon: 79 };
+      renderMap();
+    });
+  }
+
+  /* ── search: any station, state or country ───────────────────────────── */
+  function stateOf(c) { return c.state_name || c.st || ""; }
+
+  function focusStation(id) {
+    var c = null;
+    state.stations.forEach(function (s) { if (s.id === id) c = s; });
+    if (!c) return;
+    var box = $("#searchRes"), input = $("#search");
+    if (box) box.hidden = true;
+    if (input) input.value = c.name;
+
+    state.mapCenter[state.view] = { lat: c.lat, lon: c.lon };
+    state.mapZoom = Math.max(state.mapZoom, state.view === "world" ? 5 : 2.2);
+    renderMap();
+    openStation(id);
+  }
+
+  function wireSearch() {
+    var input = $("#search"), box = $("#searchRes");
+    if (!input || !box) return;
+
+    function close() { box.hidden = true; box.innerHTML = ""; }
+
+    function render(q) {
+      q = String(q || "").trim().toLowerCase();
+      if (!q) { close(); return; }
+      var hits = state.stations.filter(function (c) {
+        var hay = (c.name + " " + stateOf(c) + " " + c.country + " " + c.region).toLowerCase();
+        return hay.indexOf(q) > -1;
+      }).slice(0, 8);
+
+      if (!hits.length) {
+        box.innerHTML = '<div class="sr sr--empty">No station for "' + esc(q) + '"</div>';
+        box.hidden = false;
+        return;
+      }
+      box.innerHTML = hits.map(function (c) {
+        var rec = state.byId[c.id];
+        var meta = stateOf(c) || c.country;
+        if (rec) meta += " · " + fx(rec.today, 1) + " mm · " + fx(rec.tmaxToday, 1) + "°";
+        return '<div class="sr" role="option" data-id="' + c.id + '">'
+          + '<span class="sr__n">' + esc(c.name) + "</span>"
+          + '<span class="sr__m">' + esc(meta) + "</span></div>";
+      }).join("");
+      box.hidden = false;
+    }
+
+    input.addEventListener("input", function () { render(input.value); });
+    input.addEventListener("focus", function () { if (input.value.trim()) render(input.value); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { input.value = ""; close(); input.blur(); }
+      if (e.key === "Enter") {
+        var first = box.querySelector(".sr[data-id]");
+        if (first) focusStation(first.getAttribute("data-id"));
+      }
+    });
+    box.addEventListener("click", function (e) {
+      var row = e.target.closest(".sr[data-id]");
+      if (row) focusStation(row.getAttribute("data-id"));
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".searchbox")) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "/" && !e.target.matches("input, select, textarea")) {
+        e.preventDefault();
+        input.focus();
+      }
+    });
   }
 
   /* ── verification: read the satellite's own pixels ───────────────────── */
@@ -1687,6 +1890,8 @@
     renderStatic();
     renderBriefing();
     wire();
+    wireMap();
+    wireSearch();
     wireTable();
     wireFeedback();
     tickClock();

@@ -77,3 +77,31 @@ insert into public.eni_outlook (period, probability, statement, issued_on) value
   ('Jan–Mar 2027', 83, 'strong-to-very-strong event', '2026-10-08')
 on conflict (period) do update set
   probability = excluded.probability, statement = excluded.statement, issued_on = excluded.issued_on;
+
+-- ── state / province names (used by the search box) ────────────────────────
+alter table public.eni_stations add column if not exists state_name text;
+
+update public.eni_stations s
+   set state_name = v.state_name
+  from (values
+  ('delhi', 'Delhi'),
+  ('jaipur', 'Rajasthan'),
+  ('srinagar', 'Jammu & Kashmir'),
+  ('mumbai', 'Maharashtra'),
+  ('ahmedabad', 'Gujarat'),
+  ('nagpur', 'Maharashtra'),
+  ('bhopal', 'Madhya Pradesh'),
+  ('kolkata', 'West Bengal'),
+  ('bhubaneswar', 'Odisha'),
+  ('patna', 'Bihar'),
+  ('guwahati', 'Assam'),
+  ('chennai', 'Tamil Nadu'),
+  ('bengaluru', 'Karnataka'),
+  ('hyderabad', 'Telangana'),
+  ('trivandrum', 'Kerala'),
+  ('karachi', 'Sindh'),
+  ('dhaka', 'Dhaka'),
+  ('kathmandu', 'Bagmati'),
+  ('colombo', 'Western')
+  ) as v(id, state_name)
+ where s.id = v.id;

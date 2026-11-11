@@ -108,7 +108,7 @@ other applications in the same project.
 
 | Table | Purpose | Browser access |
 |---|---|---|
-| `eni_stations` | Station register — adding a row adds a station everywhere | read |
+| `eni_stations` | Station register (name, state, region, zone, coordinates) — adding a row adds a station everywhere, including the search | read |
 | `eni_thresholds` | IMD heat and rainfall categories that drive the alert chips | read |
 | `eni_enso_seasons` | RONI/ONI record by 3-month season | read |
 | `eni_nino_regions` | Weekly Niño-box departures | read |
@@ -164,10 +164,21 @@ Static host, no build. On GitHub Pages, Netlify or Vercel: publish the repositor
 |---|---|
 | `R` | Refresh every feed now |
 | `T` | Toggle dark / light |
+| `/` | Jump to the station search |
 | `Esc` | Close the station drawer |
 
 The map has its own controls: an **India / World** extent switch, a play button, a frame scrubber
 and a 12 h / 24 h / 72 h loop span.
+
+**Map navigation.** Drag to pan, pinch to zoom on touch, scroll-wheel or double-click to zoom on
+desktop, and the `+` / `−` / `⌖` buttons in the corner for everything else. Tile zoom follows the
+scale — push past 1.4× and the map pulls the next zoom level of imagery rather than stretching
+what it has. Labels declutter themselves: when two stations would collide, the lower-priority one
+drops its label and keeps its dot.
+
+**Search.** The box in the sub-bar matches station name, state or province, country and region —
+type `Kerala`, `Maharashtra` or `Odisha` and pick the station. It opens that station's drawer and
+flies the map to it.
 
 Region filters and the station drawer are also linkable: `?region=south`.
 
