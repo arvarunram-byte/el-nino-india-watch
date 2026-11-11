@@ -7,7 +7,25 @@ reference data (stations, IMD thresholds, the ENSO record) lives in Supabase so 
 edited without touching code.
 
 **Coverage:** 42 stations — all 28 states, all 8 union territories, plus Karachi, Dhaka, Kathmandu
-and Colombo. Search by station, state or country.
+and Colombo — and **635 districts** in a separate register. Search by district, station, state or
+country; picking a district fetches that district's own live readout.
+
+### Districts
+
+`eni_districts` holds 635 districts from the open-admin-data India administrative divisions
+dataset, each with an LGD-style code, its state, its name in its own script, and a centroid.
+Every row was validated on load: all 635 fall inside the 6–37.5 °N, 68–97.5 °E envelope, and
+spot checks against known city coordinates land within half a degree (Chennai 0.06°, Jaipur 0.05°,
+Kolkata 0.05°, Patna 0.19°).
+
+Pick a district in the search box and the drawer fetches, for that centroid: current temperature,
+feels-like, humidity, wind, today's rain, PM2.5, river discharge, the four-layer soil column and a
+seven-day forecast. One request per district rather than 635 upfront — the page stays light, and
+any district in the register is reachable.
+
+The register predates the 2023–24 district reorganisation, so it carries 635 of today's ~780
+districts. Replacing the file and re-running the loader adds the rest; nothing in the code assumes
+a count.
 
 **Live site:** https://arvarunram-byte.github.io/el-nino-india-watch/
 

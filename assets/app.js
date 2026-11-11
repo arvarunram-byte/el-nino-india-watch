@@ -39,6 +39,7 @@
     playing: false,
     lang: "en",
     alias: {},
+    districts: [],
     cycle: 0,
     busy: false,
     nextTick: POLL_SECONDS,
@@ -1301,11 +1302,23 @@
         return al ? al.some(function (n) { return n.indexOf(raw) > -1; }) : false;
       }).slice(0, 8);
 
-      if (!hits.length) {
-        box.innerHTML = '<div class="sr sr--empty">No station for "' + esc(q) + '"</div>';
+      if (!hits.length && !dhits.length) {
+        box.innerHTML = '<div class="sr sr--empty">Nothing for "' + esc(q) + '"</div>';
         box.hidden = false;
         return;
       }
+      var dq = String(q || "").trim().toLowerCase();
+      var dhits = (state.districts || []).filter(function (d) {
+        var hay = (d.name + " " + d.state + " " + (d.local || "")).toLowerCase();
+        return hay.indexOf(dq) > -1;
+      }).slice(0, 5);
+
+      var dHTML = dhits.map(function (d) {
+        return '<div class="sr" role="option" data-dist="' + esc(d.id) + '">'
+          + '<span class="sr__n">' + esc(d.name) + "</span>"
+          + '<span class="sr__m">' + esc(d.state) + " · district</span></div>";
+      }).join("");
+
       box.innerHTML = hits.map(function (c) {
         var rec = state.byId[c.id];
         var native = (state.alias && state.alias[c.id] || []).filter(function (n) { return n.indexOf(raw) > -1; })[0];
@@ -1314,7 +1327,7 @@
         return '<div class="sr" role="option" data-id="' + c.id + '">'
           + '<span class="sr__n">' + esc(c.name) + "</span>"
           + '<span class="sr__m">' + esc(meta) + "</span></div>";
-      }).join("");
+      }).join("") + dHTML;
       box.hidden = false;
     }
 
@@ -1328,6 +1341,13 @@
       }
     });
     box.addEventListener("click", function (e) {
+      var dr = e.target.closest(".sr[data-dist]");
+      if (dr) {
+        var id = dr.getAttribute("data-dist");
+        var d = (state.districts || []).filter(function (x) { return x.id === id; })[0];
+        if (d) openDistrict(d);
+        return;
+      }
       var row = e.target.closest(".sr[data-id]");
       if (row) focusStation(row.getAttribute("data-id"));
     });
@@ -1431,6 +1451,113 @@
           + '<span class="wind__v" style="color:' + col + '">' + fx(r.pm, 0) + "</span>"
           + '<span class="wind__c">' + (num(r.hum) ? fx(r.hum, 0) + "%" : "—") + "</span></div>";
       }).join("");
+  }
+
+  /* ── districts: 635 of them, each with a full on-demand readout ──────── */
+  function loadDistricts() {
+    return sbGet("eni_districts?select=id,name,state,name_local,lat,lon&order=name.asc", 18000)
+      .then(function (rows) {
+        state.districts = Array.isArray(rows) ? rows.map(function (d) {
+          return { id: d.id, name: d.name, state: d.state, local: d.name_local, lat: +d.lat, lon: +d.lon };
+        }) : [];
+        return state.districts;
+      })
+      .catch(function () { state.districts = []; return []; });
+  }
+
+  function districtURLs(d) {
+    var q = "latitude=" + d.lat + "&longitude=" + d.lon;
+    return {
+      wx: "https://api.open-meteo.com/v1/forecast?" + q
+        + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m"
+        + "&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,soil_moisture_0_to_7cm_mean,soil_moisture_7_to_28cm_mean,soil_moisture_28_to_100cm_mean,soil_moisture_100_to_255cm_mean"
+        + "&past_days=7&forecast_days=7&timezone=Asia%2FKolkata",
+      river: "https://flood-api.open-meteo.com/v1/flood?" + q + "&daily=river_discharge&past_days=7&forecast_days=7",
+      air: "https://air-quality-api.open-meteo.com/v1/air-quality?" + q + "&current=pm2_5,pm10,aerosol_optical_depth"
+    };
+  }
+
+  function openDistrict(d) {
+    var box = $("#searchRes"), input = $("#search");
+    if (box) box.hidden = true;
+    if (input) input.value = d.name;
+
+    setText("drawerTitle", d.name);
+    setText("drawerRegion", d.state + " · district");
+    var body = $("#drawerBody");
+    if (body) body.innerHTML = '<div class="loading">Fetching this district…</div>';
+    $("#drawer").hidden = false;
+    document.body.style.overflow = "hidden";
+
+    state.mapCenter[state.view] = { lat: d.lat, lon: d.lon };
+    state.mapZoom = Math.max(state.mapZoom, state.view === "world" ? 5 : 2.2);
+    renderMap();
+
+    var u = districtURLs(d);
+    Promise.all([
+      getJSON(u.wx, 20000).catch(function () { return null; }),
+      getJSON(u.river, 20000).catch(function () { return null; }),
+      getJSON(u.air, 15000).catch(function () { return null; })
+    ]).then(function (res) { paintDistrict(d, res[0], res[1], res[2]); });
+  }
+
+  function paintDistrict(d, wx, rv, aq) {
+    var body = $("#drawerBody");
+    if (!body) return;
+    var cur = (wx && wx.current) || {};
+    var dl = (wx && wx.daily) || {};
+    var soil = function (k) {
+      var a = (dl[k] || []).map(function (v) { return num(v) ? v : NaN; });
+      return a.length > 7 ? a[6] : NaN;
+    };
+    var rain = (dl.precipitation_sum || []).map(function (v) { return num(v) ? v : 0; });
+    var q = ((rv && rv.daily && rv.daily.river_discharge) || []).map(function (v) { return num(v) ? v : NaN; });
+    var air = (aq && aq.current) || {};
+
+    var cells = [
+      ["Temperature", fx(cur.temperature_2m, 1) + "<small> °C</small>"],
+      ["Feels like", fx(cur.apparent_temperature, 1) + "<small> °C</small>"],
+      ["Humidity", fx(cur.relative_humidity_2m, 0) + "<small> %</small>"],
+      ["Wind", fx(cur.wind_speed_10m, 1) + "<small> km/h</small>"],
+      ["Rain today", fx(rain[7], 1) + "<small> mm</small>"],
+      ["PM2.5", fx(air.pm2_5, 0) + "<small> μg/m³</small>"],
+      ["River", (num(q[6]) ? fx(q[6], 0) + "<small> m³/s</small>" : "—")],
+      ["Coordinates", d.lat.toFixed(2) + ", " + d.lon.toFixed(2)]
+    ];
+
+    var html = '<div class="dgrid">' + cells.map(function (c) {
+      return '<div class="dcell"><div class="dcell__k">' + c[0] + '</div><div class="dcell__v">' + c[1] + "</div></div>";
+    }).join("") + "</div>";
+
+    var layers = [soil("soil_moisture_0_to_7cm_mean"), soil("soil_moisture_7_to_28cm_mean"),
+                  soil("soil_moisture_28_to_100cm_mean"), soil("soil_moisture_100_to_255cm_mean")];
+    html += '<div><div class="dsec__h">Water in the ground · 0–7 · 7–28 · 28–100 · 100–255 cm</div>'
+      + '<div class="grow" style="grid-template-columns:repeat(4,minmax(0,1fr)) 46px">'
+      + layers.map(function (v) {
+          var pct = clamp((num(v) ? v : 0) * 200, 1, 100);
+          return '<span class="grow__b"><i style="width:' + pct + "%;background:" + soilColor(v) + '"></i></span>';
+        }).join("")
+      + '<span class="grow__v">' + (num(layers[3]) ? fx(layers[3] * 100, 0) + "%" : "—") + "</span></div></div>";
+
+    if (dl.time) {
+      html += '<div><div class="dsec__h">Next 7 days</div><div class="tbl-wrap" style="max-height:none"><table class="tbl">'
+        + '<thead><tr><th class="s-left">Day</th><th>Rain mm</th><th>Max °C</th><th>Min °C</th></tr></thead><tbody>'
+        + dl.time.slice(8, 15).map(function (t, i) {
+            var k = i + 8;
+            var dd = new Date(t + "T00:00:00");
+            return '<tr><td class="s-left">' + dd.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" }) + "</td>"
+              + "<td>" + fx(dl.precipitation_sum[k], 1) + "</td>"
+              + "<td>" + fx(dl.temperature_2m_max[k], 1) + "</td>"
+              + "<td>" + fx(dl.temperature_2m_min[k], 1) + "</td></tr>";
+          }).join("")
+        + "</tbody></table></div></div>";
+    }
+
+    html += '<p class="footnote">Fetched live for this district centroid. Soil water is the ERA5 land-surface column, '
+      + 'river flow is GloFAS at the nearest river cell, PM2.5 is the CAMS model. Register: '
+      + esc(d.state) + " · LGD " + esc(d.id) + "</p>";
+
+    body.innerHTML = html;
   }
 
   /* ── Indian-script station search ────────────────────────────────────── */
@@ -2261,6 +2388,7 @@
     setInterval(tickClock, 1000);
     setInterval(tickRing, 1000);
 
+    loadDistricts();
     loadBackend().catch(function () {
       state.backend = "fallback";
       setText("backendMeta", "supabase unreachable · embedded register");
