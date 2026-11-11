@@ -38,6 +38,7 @@
     frame: 11,
     playing: false,
     lang: "en",
+    alias: {},
     cycle: 0,
     busy: false,
     nextTick: POLL_SECONDS,
@@ -1142,6 +1143,10 @@
   function applyBriefing(code) {
     var B = window.ENI_BRIEFING;
     if (!B || !B.items[code]) return;
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+    }
     var it = B.items[code];
     state.lang = code;
     store.set("eni.lang", code);
@@ -1288,9 +1293,12 @@
     function render(q) {
       q = String(q || "").trim().toLowerCase();
       if (!q) { close(); return; }
+      var raw = String(q || "").trim();
       var hits = state.stations.filter(function (c) {
         var hay = (c.name + " " + stateOf(c) + " " + c.country + " " + c.region).toLowerCase();
-        return hay.indexOf(q) > -1;
+        if (hay.indexOf(q) > -1) return true;
+        var al = state.alias && state.alias[c.id];
+        return al ? al.some(function (n) { return n.indexOf(raw) > -1; }) : false;
       }).slice(0, 8);
 
       if (!hits.length) {
@@ -1300,7 +1308,8 @@
       }
       box.innerHTML = hits.map(function (c) {
         var rec = state.byId[c.id];
-        var meta = stateOf(c) || c.country;
+        var native = (state.alias && state.alias[c.id] || []).filter(function (n) { return n.indexOf(raw) > -1; })[0];
+        var meta = native ? native + " · " + (stateOf(c) || c.country) : (stateOf(c) || c.country);
         if (rec) meta += " · " + fx(rec.today, 1) + " mm · " + fx(rec.tmaxToday, 1) + "°";
         return '<div class="sr" role="option" data-id="' + c.id + '">'
           + '<span class="sr__n">' + esc(c.name) + "</span>"
@@ -1331,6 +1340,105 @@
         input.focus();
       }
     });
+  }
+
+  /* ── Indian-script station search ────────────────────────────────────── */
+  function buildAliases() {
+    state.alias = {};
+    var A = window.ENI_ALIASES;
+    if (!A) return;
+    Object.keys(A).forEach(function (lang) {
+      A[lang].forEach(function (name, i) {
+        var local = REF.STATIONS[i];
+        if (!local) return;
+        (state.alias[local.id] = state.alias[local.id] || []).push(name);
+      });
+    });
+  }
+
+  /* ── spoken briefing ─────────────────────────────────────────────────── */
+  var VOICE_LANG = {
+    en: "en-IN", hi: "hi-IN", bn: "bn-IN", mr: "mr-IN", gu: "gu-IN",
+    ta: "ta-IN", te: "te-IN", kn: "kn-IN", ml: "ml-IN"
+  };
+
+  function setSpeaking(on) {
+    var b = $("#speakBtn");
+    if (b) {
+      b.setAttribute("aria-pressed", String(on));
+      b.textContent = on ? "Stop" : "Listen";
+    }
+  }
+
+  function speakBriefing() {
+    if (!("speechSynthesis" in window)) { toast("This browser has no speech engine"); return; }
+    var synth = window.speechSynthesis;
+    if (synth.speaking || synth.pending) { synth.cancel(); setSpeaking(false); return; }
+
+    var it = (window.ENI_BRIEFING || {}).items[state.lang];
+    if (!it) return;
+
+    var u = new SpeechSynthesisUtterance(it.text.replace(/\s+/g, " ").trim());
+    var want = VOICE_LANG[state.lang] || "en-IN";
+    u.lang = want;
+    u.rate = 0.95;
+
+    var voices = synth.getVoices() || [];
+    var v = voices.filter(function (x) { return x.lang === want; })[0]
+         || voices.filter(function (x) { return x.lang && x.lang.indexOf(want.slice(0, 2)) === 0; })[0];
+    if (v) u.voice = v;
+    else if (state.lang !== "en") toast("No " + it.label + " voice on this device — using the default voice");
+
+    u.onend = function () { setSpeaking(false); };
+    u.onerror = function () { setSpeaking(false); };
+    synth.speak(u);
+    setSpeaking(true);
+  }
+
+  /* ── shareable digest ────────────────────────────────────────────────── */
+  function buildDigest() {
+    var B = window.ENI_BRIEFING || {};
+    var it = (B.items || {})[state.lang] || (B.items || {}).en || { text: "" };
+    var rows = filtered();
+    var out = [];
+    out.push("ENI · India climate & water watch — "
+      + new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }));
+    out.push("");
+    out.push(it.text.replace(/\s+/g, " ").trim());
+    out.push("");
+
+    if (rows.length) {
+      var wet = rows.slice().sort(function (a, b) { return b.today - a.today; })[0];
+      var hot = rows.slice().sort(function (a, b) { return b.tmaxToday - a.tmaxToday; })[0];
+      out.push("Rain today: mean " + fx(mean(rows.map(function (r) { return r.today; })), 1)
+        + " mm · wettest " + wet.station.name + " " + fx(wet.today, 1) + " mm");
+      out.push("Heat: " + hot.station.name + " " + fx(hot.tmaxToday, 1) + " °C max");
+    }
+    if (state.water && state.water.length) {
+      var w = state.water.filter(function (r) { return state.region === "all" || r.c.region === state.region; });
+      var bal = mean(w.map(function (r) { return r.bal; }));
+      var big = w.slice().sort(function (a, b) { return (b.q || -1) - (a.q || -1); })[0];
+      out.push("Water: 30-day balance " + sgn(bal, 0) + " mm · biggest river "
+        + (big && num(big.q) ? big.c.name + " " + fx(big.q, 0) + " m³/s" : "—"));
+    }
+    var wind = rows.filter(function (r) { return num(r.wind); });
+    if (wind.length) out.push("Wind: mean " + fx(mean(wind.map(function (r) { return r.wind; })), 1) + " km/h");
+
+    out.push("");
+    out.push("Sources: NOAA CPC · Open-Meteo · NASA GIBS · GloFAS · Supabase");
+    out.push(location.origin + location.pathname + (state.region === "all" ? "" : "?region=" + state.region));
+    return out.join("\n");
+  }
+
+  function copyDigest() {
+    var text = buildDigest();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { toast("Digest copied — paste it into Slack, mail or WhatsApp"); },
+        function () { toast("Could not copy"); });
+    } else {
+      toast("Clipboard not available in this browser");
+    }
   }
 
   /* ── water: soil-water balance and river discharge ───────────────────── */
@@ -1988,6 +2096,8 @@
     $("#themeBtn").addEventListener("click", function () {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
     });
+    $("#speakBtn").addEventListener("click", speakBriefing);
+    $("#digestBtn").addEventListener("click", copyDigest);
     $("#exportBtn").addEventListener("click", exportCsv);
     $("#shareBtn").addEventListener("click", shareView);
     $("#drawerClose").addEventListener("click", closeStation);
@@ -2033,6 +2143,7 @@
     document.documentElement.setAttribute("data-theme", theme);
 
     renderStatic();
+    buildAliases();
     renderBriefing();
     wire();
     wireMap();
