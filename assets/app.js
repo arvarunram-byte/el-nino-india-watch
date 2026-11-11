@@ -177,7 +177,7 @@
     var lat = list.map(function (c) { return c.lat; }).join(",");
     var lon = list.map(function (c) { return c.lon; }).join(",");
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
-      + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m"
+      + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m"
       + "&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,apparent_temperature_max"
       + "&past_days=92&forecast_days=7&timezone=Asia%2FKolkata";
     return getJSON(url).then(function (j) { return Array.isArray(j) ? j : [j]; });
@@ -237,6 +237,7 @@
       temp: num(cur.temperature_2m) ? cur.temperature_2m : NaN,
       rh: num(cur.relative_humidity_2m) ? cur.relative_humidity_2m : NaN,
       wind: num(cur.wind_speed_10m) ? cur.wind_speed_10m : NaN,
+      windDir: num(cur.wind_direction_10m) ? cur.wind_direction_10m : NaN,
       anom7: anom,
       flag: flag,
       threshold: thr,
@@ -1332,6 +1333,141 @@
     });
   }
 
+  /* ── water: soil-water balance and river discharge ───────────────────── */
+  function stationCoords() {
+    return {
+      lat: state.stations.map(function (c) { return c.lat; }).join(","),
+      lon: state.stations.map(function (c) { return c.lon; }).join(",")
+    };
+  }
+
+  function loadWater() {
+    var c = stationCoords();
+    return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + c.lat + "&longitude=" + c.lon
+      + "&daily=soil_moisture_0_to_7cm_mean,soil_moisture_28_to_100cm_mean,et0_fao_evapotranspiration,precipitation_sum"
+      + "&past_days=30&forecast_days=1&timezone=Asia%2FKolkata", 30000)
+      .then(function (j) { return Array.isArray(j) ? j : [j]; });
+  }
+
+  function loadRivers() {
+    var c = stationCoords();
+    return getJSON("https://flood-api.open-meteo.com/v1/flood?latitude=" + c.lat + "&longitude=" + c.lon
+      + "&daily=river_discharge&past_days=30&forecast_days=7", 30000)
+      .then(function (j) { return Array.isArray(j) ? j : [j]; });
+  }
+
+  function renderWater(wArr, rArr) {
+    var rows = state.stations.map(function (c, i) {
+      var w = wArr[i] || {}, d = w.daily || {};
+      var soil = (d.soil_moisture_28_to_100cm_mean || []).map(function (v) { return num(v) ? v : NaN; });
+      var rain = (d.precipitation_sum || []).map(function (v) { return num(v) ? v : 0; });
+      var et = (d.et0_fao_evapotranspiration || []).map(function (v) { return num(v) ? v : 0; });
+      var r = rArr[i] || {}, rd = r.daily || {};
+      var q = (rd.river_discharge || []).map(function (v) { return num(v) ? v : NaN; });
+      var qNow = q.length > 30 ? q[30] : NaN;
+      var qMean = mean(q.slice(0, 30).filter(num));
+      var soilNow = soil.length > 1 ? soil[soil.length - 2] : NaN;
+      var soilStart = soil.length ? soil[0] : NaN;
+      return {
+        c: c,
+        bal: sum(rain) - sum(et),
+        soil: soilNow,
+        dSoil: (num(soilNow) && num(soilStart)) ? soilNow - soilStart : NaN,
+        q: qNow,
+        qPct: (num(qNow) && num(qMean) && qMean > 0) ? ((qNow - qMean) / qMean) * 100 : NaN
+      };
+    });
+    state.water = rows;
+    paintWater();
+  }
+
+  function paintWater() {
+    var all = state.water || [];
+    if (!all.length) return;
+    var rows = all.filter(function (r) { return state.region === "all" || r.c.region === state.region; });
+    if (!rows.length) return;
+
+    var bal = mean(rows.map(function (r) { return r.bal; }));
+    var soil = mean(rows.map(function (r) { return r.soil; }).filter(num));
+    var deficit = rows.filter(function (r) { return r.bal < 0; }).length;
+    var big = rows.slice().sort(function (a, b) { return (b.q || -1) - (a.q || -1); })[0];
+
+    setHTML("wBal", sgn(bal, 0) + "<small> mm</small>");
+    setHTML("wSoil", (num(soil) ? fx(soil * 100, 1) : "—") + "<small> %vol</small>");
+    setHTML("wDef", deficit + "<small> / " + rows.length + "</small>");
+    setText("wRiver", big && num(big.q) ? big.c.name : "—");
+    setText("wRiverS", big && num(big.q) ? fx(big.q, 0) + " m³/s · " + (stateOf(big.c) || big.c.country) : "discharge");
+    setText("waterMeta", rows.length + " stations · 30-day window");
+
+    var soilHost = $("#soilList");
+    if (soilHost) {
+      var dry = rows.filter(function (r) { return num(r.soil); }).sort(function (a, b) { return a.soil - b.soil; }).slice(0, 9);
+      soilHost.innerHTML = dry.map(function (r) {
+        var pct = clamp(r.soil * 200, 2, 100);   // 0.5 m³/m³ saturates the bar
+        var col = r.dSoil < -0.01 ? "var(--heat)" : r.dSoil > 0.01 ? "var(--rain)" : "var(--faint)";
+        return '<div class="wrow">'
+          + '<div class="wrow__n"><span>' + esc(r.c.name) + "</span><em>" + esc(stateOf(r.c) || r.c.country) + "</em></div>"
+          + '<div class="wrow__v">' + fx(r.soil * 100, 1) + "%</div>"
+          + '<div class="wrow__t"><div class="wrow__f" style="width:' + pct + '%;background:' + col + '"></div></div>'
+          + "</div>";
+      }).join("");
+    }
+
+    var riverHost = $("#riverList");
+    if (riverHost) {
+      var wet = rows.filter(function (r) { return num(r.q); }).sort(function (a, b) { return b.q - a.q; }).slice(0, 9);
+      var maxQ = Math.max.apply(null, wet.map(function (r) { return r.q; }).concat([1]));
+      riverHost.innerHTML = wet.map(function (r) {
+        var pct = clamp((r.q / maxQ) * 100, 2, 100);
+        var col = r.qPct > 10 ? "var(--rain)" : r.qPct < -10 ? "var(--heat)" : "var(--faint)";
+        return '<div class="wrow">'
+          + '<div class="wrow__n"><span>' + esc(r.c.name) + "</span><em>" + (isFinite(r.qPct) ? sgn(r.qPct, 0) + "%" : "—") + "</em></div>"
+          + '<div class="wrow__v">' + fx(r.q, 0) + "</div>"
+          + '<div class="wrow__t"><div class="wrow__f" style="width:' + pct + '%;background:' + col + '"></div></div>'
+          + "</div>";
+      }).join("");
+    }
+  }
+
+  /* ── air movement ────────────────────────────────────────────────────── */
+  var COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+
+  function renderAir(rows) {
+    var w = rows.filter(function (r) { return num(r.wind); });
+    if (!w.length) {
+      setText("aMean", "—"); setText("aMax", "no wind data"); setText("aMaxS", "");
+      return;
+    }
+    var meanW = mean(w.map(function (r) { return r.wind; }));
+    var top = w.slice().sort(function (a, b) { return b.wind - a.wind; })[0];
+
+    var dirs = w.filter(function (r) { return num(r.windDir); });
+    var sinS = 0, cosS = 0;
+    dirs.forEach(function (r) {
+      var a = r.windDir * Math.PI / 180;
+      sinS += Math.sin(a); cosS += Math.cos(a);
+    });
+    var prevailing = dirs.length ? (Math.atan2(sinS, cosS) * 180 / Math.PI + 360) % 360 : NaN;
+
+    setHTML("aMean", fx(meanW, 1) + "<small> km/h</small>");
+    setText("aMax", top.station.name);
+    setText("aMaxS", fx(top.wind, 1) + " km/h · " + (stateOf(top.station) || top.station.country));
+    setText("aDir", num(prevailing) ? COMPASS[Math.round(prevailing / 22.5) % 16] : "—");
+
+    var host = $("#windList");
+    if (!host) return;
+    host.innerHTML = w.slice().sort(function (a, b) { return b.wind - a.wind; }).slice(0, 9).map(function (r) {
+      var rot = num(r.windDir) ? (r.windDir + 180) % 360 : 0;
+      var comp = num(r.windDir) ? COMPASS[Math.round(r.windDir / 22.5) % 16] : "—";
+      return '<div class="wind">'
+        + '<span class="wind__a"><svg width="14" height="14" viewBox="0 0 16 16" style="transform:rotate(' + rot + 'deg)">'
+        + '<path d="M8 1.5 12 13 8 10.4 4 13z" fill="currentColor"/></svg></span>'
+        + '<span class="wind__n">' + esc(r.station.name) + "</span>"
+        + '<span class="wind__v">' + fx(r.wind, 1) + "</span>"
+        + '<span class="wind__c">' + comp + "</span></div>";
+    }).join("");
+  }
+
   /* ── verification: read the satellite's own pixels ───────────────────── */
   var VZ = 6;
   var tileCache = {};
@@ -1729,9 +1865,16 @@
         renderAlerts(rows);
         renderRain(rows);
         renderHeat(rows);
+        renderAir(rows);
         renderMap();
         setText("stationCount", rows.length + " of " + state.rows.length + " stations");
         if (initial || state.cycle % 5 === 1) runVerification();
+        if (initial || state.cycle % 5 === 1) {
+          Promise.allSettled([loadWater(), loadRivers()]).then(function (res) {
+            renderWater(res[0].status === "fulfilled" ? res[0].value : [],
+                        res[1].status === "fulfilled" ? res[1].value : []);
+          });
+        }
       } else {
         setText("stationCount", "feed unavailable");
         var body = $("#rainBody");
@@ -1789,6 +1932,8 @@
       renderAlerts(rows);
       renderRain(rows);
       renderHeat(rows);
+      renderAir(rows);
+      paintWater();
       setText("stationCount", rows.length + " of " + state.rows.length + " stations");
     }
     renderMap();

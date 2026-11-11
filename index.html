@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ENI · El Niño / India Climate Watch</title>
-<meta name="description" content="Live El Niño status, rainfall, heat and climate-change readings for India and its neighbourhood — satellite imagery, model feeds and NOAA indices in one console.">
+<title>ENI · India Climate &amp; Water Watch</title>
+<meta name="description" content="Live rainfall, heat, groundwater, river flow, wind and climate readings for every state and union territory of India — satellite imagery, model feeds and NOAA indices in one console.">
 <meta name="theme-color" content="#090c10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +28,7 @@
       </svg>
       <span class="brand__txt">
         <span class="brand__name">ENI</span>
-        <span class="brand__sub">El Niño / India watch</span>
+        <span class="brand__sub">India climate &amp; water watch</span>
       </span>
     </a>
 
@@ -39,6 +39,8 @@
       <a href="#p-map">Satellite</a>
       <a href="#p-climate">Climate</a>
       <a href="#p-pacific">Pacific</a>
+      <a href="#p-water">Water</a>
+      <a href="#p-air">Air</a>
       <a href="#p-brief">Briefing</a>
       <a href="#p-verify">Verify</a>
       <a href="#p-data">Data</a>
@@ -305,10 +307,63 @@
   </div>
 </section>
 
+<!-- ══ WATER ═════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-water">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">06</span><span class="dot dot--water"></span><h2>Water — ground &amp; rivers</h2></div>
+    <div class="panel__meta" id="waterMeta">soil-water balance · river discharge</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">30-day balance</div><div class="kpi__v" id="wBal">—</div><div class="kpi__s">rain − evaporation</div></div>
+      <div class="kpi"><div class="kpi__k">Deep soil water</div><div class="kpi__v" id="wSoil">—</div><div class="kpi__s">28–100 cm layer</div></div>
+      <div class="kpi"><div class="kpi__k">In deficit</div><div class="kpi__v" id="wDef">—</div><div class="kpi__s">stations drying out</div></div>
+      <div class="kpi"><div class="kpi__k">Biggest river</div><div class="kpi__v kpi__v--sm" id="wRiver">—</div><div class="kpi__s" id="wRiverS">discharge</div></div>
+    </div>
+    <div class="duo">
+      <div>
+        <div class="minih"><span>Groundwater recharge signal</span><span class="mono">soil water, 28–100 cm</span></div>
+        <div class="hlist" id="soilList"><div class="loading">Loading soil water…</div></div>
+      </div>
+      <div>
+        <div class="minih"><span>River flow</span><span class="mono">m³/s vs 30-day mean</span></div>
+        <div class="hlist" id="riverList"><div class="loading">Loading river discharge…</div></div>
+      </div>
+    </div>
+    <p class="footnote">
+      Soil water and the rain-minus-evaporation balance are modelled from the ECMWF/ERA5 land surface,
+      and river discharge from the GloFAS routing model at the cell nearest each station. Neither is a
+      well measurement: for actual CGWB observation-well levels, see the Central Ground Water Board.
+      Read this as the direction water is moving, not as a water-table depth.
+    </p>
+  </div>
+</section>
+
+<!-- ══ AIR ════════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-air">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">07</span><span class="dot dot--air"></span><h2>Air movement</h2></div>
+    <div class="panel__meta">10 m wind · direction &amp; speed</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Mean wind</div><div class="kpi__v" id="aMean">—</div><div class="kpi__s">km/h</div></div>
+      <div class="kpi"><div class="kpi__k">Strongest</div><div class="kpi__v kpi__v--sm" id="aMax">—</div><div class="kpi__s" id="aMaxS">station</div></div>
+      <div class="kpi"><div class="kpi__k">Prevailing</div><div class="kpi__v kpi__v--sm" id="aDir">—</div><div class="kpi__s">blowing from</div></div>
+    </div>
+    <div class="hlist" id="windList"><div class="loading">Loading wind…</div></div>
+    <p class="footnote">
+      Wind is the ECMWF 10-metre field, not a satellite scatterometer retrieval. Watch the arrows:
+      during the north-east monsoon the peninsula should carry air from the north-east, while the
+      Gangetic plain turns light and variable.
+    </p>
+  </div>
+</section>
+
 <!-- ══ BRIEFING ═══════════════════════════════════════════════════════ -->
 <section class="panel panel--brief" id="p-brief">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">06</span><span class="dot dot--brief"></span><h2>Briefing</h2></div>
+    <div class="panel__title"><span class="idx">08</span><span class="dot dot--brief"></span><h2>Briefing</h2></div>
     <div class="panel__meta">written &amp; translated by Sarvam</div>
   </div>
   <div class="panel__body">
@@ -324,7 +379,7 @@
 <!-- ══ VERIFICATION ═══════════════════════════════════════════════════ -->
 <section class="panel" id="p-verify">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">07</span><span class="dot dot--verify"></span><h2>Verification</h2></div>
+    <div class="panel__title"><span class="idx">09</span><span class="dot dot--verify"></span><h2>Verification</h2></div>
     <div class="panel__meta" id="verifyMeta">cross-checking the model against satellite pixels</div>
   </div>
   <div class="panel__body">
@@ -346,7 +401,7 @@
 <!-- ══ DATA ═══════════════════════════════════════════════════════════ -->
 <section class="panel" id="p-data">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">08</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
+    <div class="panel__title"><span class="idx">10</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
     <div class="panel__meta" id="backendMeta">checking backend…</div>
   </div>
   <div class="panel__body">
@@ -424,7 +479,7 @@
 
 <footer class="foot">
   <div class="foot__in">
-    <span>ENI · El Niño / India watch</span>
+    <span>ENI · India climate &amp; water watch</span>
     <span class="foot__mid">Open feeds · Supabase backend · <a id="repoLink" href="https://github.com/arvarunram-byte/el-nino-india-watch" target="_blank" rel="noopener">source on GitHub</a></span>
     <span class="mono" id="footStamp">—</span>
   </div>
