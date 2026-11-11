@@ -124,7 +124,10 @@
     var thrP = sbGet("eni_thresholds?select=*&order=kind.asc,min_value.asc")
       .then(function (rows) { return Array.isArray(rows) && rows.length ? rows : null; });
 
-    return Promise.all([stationsP, ensoP, ninoP, thrP]).then(function (res) {
+    var outP = sbGet("eni_outlook?select=*&order=probability.desc")
+      .then(function (rows) { return Array.isArray(rows) && rows.length ? rows : null; });
+
+    return Promise.all([stationsP, ensoP, ninoP, thrP, outP]).then(function (res) {
       state.stations = res[0];
       if (res[1]) {
         state.seasons = res[1].map(function (r) {
@@ -132,6 +135,14 @@
         });
       }
       if (res[2]) state.nino = res[2].map(function (r) { return { name: r.name, departure: +r.departure }; });
+      if (res[4]) {
+        state.outlook = res[4].map(function (r) {
+          return { window: r.period, probability: r.probability, statement: r.statement };
+        }).sort(function (a, b) {
+          var order = { "Sep–Nov 2026": 1, "Oct–Dec 2026": 2, "Nov–Jan 2027": 3, "Jan–Mar 2027": 4 };
+          return (order[a.window] || 99) - (order[b.window] || 99);
+        });
+      }
       if (res[3]) {
         var heat = {};
         var rain = [];
