@@ -58,6 +58,13 @@
       })
       .finally(function () { clearTimeout(t); });
   }
+  function settle(list) {
+    return Promise.all(list.map(function (p) {
+      return p.then(function (v) { return { status: "fulfilled", value: v }; },
+                    function (e) { return { status: "rejected", reason: e }; });
+    }));
+  }
+
   function sum(a) { return a.reduce(function (x, y) { return x + (isFinite(y) ? y : 0); }, 0); }
   function mean(a) { return a.length ? sum(a) / a.length : NaN; }
   function num(v) { return typeof v === "number" && isFinite(v); }
@@ -78,6 +85,14 @@
     get: function (k, fb) { try { var v = localStorage.getItem(k); return v === null ? fb : JSON.parse(v); } catch (e) { return fb; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
+
+  function showFatal(msg) {
+    var f = document.getElementById("fatal");
+    if (!f) return;
+    f.hidden = false;
+    f.textContent = "Something failed: " + String(msg).slice(0, 160)
+      + " — pull down to hard-reload. If it repeats, your network may be blocking the data feeds.";
+  }
 
   function toast(msg) {
     var t = $("#toast");
@@ -1331,7 +1346,13 @@
       box.hidden = false;
     }
 
-    input.addEventListener("input", function () { render(input.value); });
+    input.addEventListener("input", function () {
+      if (!state.districtsLoaded && !state.districtsLoading) {
+        state.districtsLoading = true;
+        loadDistricts().then(function () { state.districtsLoaded = true; });
+      }
+      render(input.value);
+    });
     input.addEventListener("focus", function () { if (input.value.trim()) render(input.value); });
     input.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { input.value = ""; close(); input.blur(); }
@@ -2184,6 +2205,11 @@
     if (state.busy) return;
     state.busy = true;
     state.cycle++;
+    try { refreshInner(initial); }
+    catch (e) { state.busy = false; showFatal(e.message); }
+  }
+
+  function refreshInner(initial) {
 
     var wantSst = initial || !state.sst || state.cycle % 5 === 0;
 
@@ -2207,7 +2233,7 @@
         setText("stationCount", rows.length + " of " + state.rows.length + " stations");
         if (initial || state.cycle % 5 === 1) runVerification();
         if (initial || state.cycle % 5 === 1) {
-          Promise.allSettled([loadWater(), loadRivers()]).then(function (res) {
+          settle([loadWater(), loadRivers()]).then(function (res) {
             renderWater(res[0].status === "fulfilled" ? res[0].value : [],
                         res[1].status === "fulfilled" ? res[1].value : []);
           });
@@ -2384,11 +2410,24 @@
     wireSearch();
     wireTable();
     wireFeedback();
+    window.addEventListener("error", function (e) { showFatal(e.message); });
+    window.addEventListener("unhandledrejection", function (e) {
+      showFatal((e.reason && e.reason.message) || e.reason);
+    });
+
+    setTimeout(function () {
+      if (!state.rows.length) {
+        var b = $("#rainBody");
+        if (b) b.innerHTML = '<tr><td colspan="6" class="loading err">'
+          + "No data after 12 seconds. Check your connection — some networks block api.open-meteo.com."
+          + "</td></tr>";
+      }
+    }, 12000);
+
     tickClock();
     setInterval(tickClock, 1000);
     setInterval(tickRing, 1000);
 
-    loadDistricts();
     loadBackend().catch(function () {
       state.backend = "fallback";
       setText("backendMeta", "supabase unreachable · embedded register");
