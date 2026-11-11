@@ -65,6 +65,12 @@
     <div class="subbar__in">
       <div class="chips" id="regionChips" role="group" aria-label="Filter by region"></div>
       <div class="subbar__right">
+        <div class="searchbox">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          <input id="search" type="search" placeholder="Search station, state or country" autocomplete="off" aria-label="Search stations" aria-controls="searchRes">
+          <kbd>/</kbd>
+          <div class="searchres" id="searchRes" hidden role="listbox"></div>
+        </div>
         <span class="mono subbar__count" id="stationCount">— stations</span>
         <button class="ghost" id="exportBtn" type="button" title="Download the station table as CSV">Export CSV</button>
         <button class="ghost" id="shareBtn" type="button" title="Copy a link to this view">Share view</button>
@@ -219,9 +225,16 @@
   <div class="panel__body panel__body--map">
     <div class="map-shell">
       <div id="mapTiles">
-        <div id="mapBase"></div>
-        <div id="mapFrames"></div>
-        <svg id="mapSvg" aria-hidden="true"></svg>
+        <div id="mapStage">
+          <div id="mapBase"></div>
+          <div id="mapFrames"></div>
+          <svg id="mapSvg" aria-hidden="true"></svg>
+        </div>
+      </div>
+      <div class="mapctl">
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        <button type="button" id="zoomReset" aria-label="Reset view" class="mapctl__r">⌖</button>
       </div>
       <div class="map-hud mono" id="mapHud">—</div>
     </div>

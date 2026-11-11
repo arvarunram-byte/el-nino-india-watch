@@ -14,6 +14,7 @@ create table if not exists public.eni_stations (
   id          text primary key,
   name        text        not null,
   country     text        not null default 'IN',
+  state_name  text,
   region      text        not null check (region in ('north','west','central','east','northeast','south','neighbours')),
   zone        text        not null check (zone in ('plains','coastal','hills')),
   lat         double precision not null check (lat between -90 and 90),

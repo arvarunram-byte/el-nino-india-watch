@@ -19,25 +19,25 @@ window.ENI = (function () {
   /* Stations: India plus the immediate neighbourhood. `region` drives the
      filter chips, `zone` drives the IMD heat threshold that applies. */
   var STATIONS = [
-    { id: "delhi",         name: "Delhi",              country: "IN", region: "north",      zone: "plains",  lat: 28.6139, lon: 77.2090, elevation_m: 216 },
-    { id: "jaipur",        name: "Jaipur",             country: "IN", region: "north",      zone: "plains",  lat: 26.9124, lon: 75.7873, elevation_m: 431 },
-    { id: "srinagar",      name: "Srinagar",           country: "IN", region: "north",      zone: "hills",   lat: 34.0837, lon: 74.7973, elevation_m: 1585 },
-    { id: "mumbai",        name: "Mumbai",             country: "IN", region: "west",       zone: "coastal", lat: 19.0760, lon: 72.8777, elevation_m: 14 },
-    { id: "ahmedabad",     name: "Ahmedabad",          country: "IN", region: "west",       zone: "plains",  lat: 23.0225, lon: 72.5714, elevation_m: 53 },
-    { id: "nagpur",        name: "Nagpur",             country: "IN", region: "central",    zone: "plains",  lat: 21.1458, lon: 79.0882, elevation_m: 310 },
-    { id: "bhopal",        name: "Bhopal",             country: "IN", region: "central",    zone: "plains",  lat: 23.2599, lon: 77.4126, elevation_m: 500 },
-    { id: "kolkata",       name: "Kolkata",            country: "IN", region: "east",       zone: "plains",  lat: 22.5726, lon: 88.3639, elevation_m: 9 },
-    { id: "bhubaneswar",   name: "Bhubaneswar",        country: "IN", region: "east",       zone: "coastal", lat: 20.2961, lon: 85.8245, elevation_m: 45 },
-    { id: "patna",         name: "Patna",              country: "IN", region: "east",       zone: "plains",  lat: 25.5941, lon: 85.1376, elevation_m: 53 },
-    { id: "guwahati",      name: "Guwahati",           country: "IN", region: "northeast",  zone: "plains",  lat: 26.1445, lon: 91.7362, elevation_m: 55 },
-    { id: "chennai",       name: "Chennai",            country: "IN", region: "south",      zone: "coastal", lat: 13.0827, lon: 80.2707, elevation_m: 6 },
-    { id: "bengaluru",     name: "Bengaluru",          country: "IN", region: "south",      zone: "plains",  lat: 12.9716, lon: 77.5946, elevation_m: 920 },
-    { id: "hyderabad",     name: "Hyderabad",          country: "IN", region: "south",      zone: "plains",  lat: 17.3850, lon: 78.4867, elevation_m: 542 },
-    { id: "trivandrum",    name: "Thiruvananthapuram", country: "IN", region: "south",      zone: "coastal", lat: 8.5241,  lon: 76.9366, elevation_m: 10 },
-    { id: "karachi",       name: "Karachi",            country: "PK", region: "neighbours", zone: "coastal", lat: 24.8607, lon: 67.0011, elevation_m: 8 },
-    { id: "dhaka",         name: "Dhaka",              country: "BD", region: "neighbours", zone: "plains",  lat: 23.8103, lon: 90.4125, elevation_m: 4 },
-    { id: "kathmandu",     name: "Kathmandu",          country: "NP", region: "neighbours", zone: "hills",   lat: 27.7172, lon: 85.3240, elevation_m: 1400 },
-    { id: "colombo",       name: "Colombo",            country: "LK", region: "neighbours", zone: "coastal", lat: 6.9271,  lon: 79.8612, elevation_m: 7 }
+    { id: "delhi",         name: "Delhi",              country: "IN", region: "north",      zone: "plains",  lat: 28.6139, lon: 77.2090, elevation_m: 216 , st: "Delhi" },
+    { id: "jaipur",        name: "Jaipur",             country: "IN", region: "north",      zone: "plains",  lat: 26.9124, lon: 75.7873, elevation_m: 431 , st: "Rajasthan" },
+    { id: "srinagar",      name: "Srinagar",           country: "IN", region: "north",      zone: "hills",   lat: 34.0837, lon: 74.7973, elevation_m: 1585 , st: "Jammu & Kashmir" },
+    { id: "mumbai",        name: "Mumbai",             country: "IN", region: "west",       zone: "coastal", lat: 19.0760, lon: 72.8777, elevation_m: 14 , st: "Maharashtra" },
+    { id: "ahmedabad",     name: "Ahmedabad",          country: "IN", region: "west",       zone: "plains",  lat: 23.0225, lon: 72.5714, elevation_m: 53 , st: "Gujarat" },
+    { id: "nagpur",        name: "Nagpur",             country: "IN", region: "central",    zone: "plains",  lat: 21.1458, lon: 79.0882, elevation_m: 310 , st: "Maharashtra" },
+    { id: "bhopal",        name: "Bhopal",             country: "IN", region: "central",    zone: "plains",  lat: 23.2599, lon: 77.4126, elevation_m: 500 , st: "Madhya Pradesh" },
+    { id: "kolkata",       name: "Kolkata",            country: "IN", region: "east",       zone: "plains",  lat: 22.5726, lon: 88.3639, elevation_m: 9 , st: "West Bengal" },
+    { id: "bhubaneswar",   name: "Bhubaneswar",        country: "IN", region: "east",       zone: "coastal", lat: 20.2961, lon: 85.8245, elevation_m: 45 , st: "Odisha" },
+    { id: "patna",         name: "Patna",              country: "IN", region: "east",       zone: "plains",  lat: 25.5941, lon: 85.1376, elevation_m: 53 , st: "Bihar" },
+    { id: "guwahati",      name: "Guwahati",           country: "IN", region: "northeast",  zone: "plains",  lat: 26.1445, lon: 91.7362, elevation_m: 55 , st: "Assam" },
+    { id: "chennai",       name: "Chennai",            country: "IN", region: "south",      zone: "coastal", lat: 13.0827, lon: 80.2707, elevation_m: 6 , st: "Tamil Nadu" },
+    { id: "bengaluru",     name: "Bengaluru",          country: "IN", region: "south",      zone: "plains",  lat: 12.9716, lon: 77.5946, elevation_m: 920 , st: "Karnataka" },
+    { id: "hyderabad",     name: "Hyderabad",          country: "IN", region: "south",      zone: "plains",  lat: 17.3850, lon: 78.4867, elevation_m: 542 , st: "Telangana" },
+    { id: "trivandrum",    name: "Thiruvananthapuram", country: "IN", region: "south",      zone: "coastal", lat: 8.5241,  lon: 76.9366, elevation_m: 10 , st: "Kerala" },
+    { id: "karachi",       name: "Karachi",            country: "PK", region: "neighbours", zone: "coastal", lat: 24.8607, lon: 67.0011, elevation_m: 8 , st: "Sindh" },
+    { id: "dhaka",         name: "Dhaka",              country: "BD", region: "neighbours", zone: "plains",  lat: 23.8103, lon: 90.4125, elevation_m: 4 , st: "Dhaka" },
+    { id: "kathmandu",     name: "Kathmandu",          country: "NP", region: "neighbours", zone: "hills",   lat: 27.7172, lon: 85.3240, elevation_m: 1400 , st: "Bagmati" },
+    { id: "colombo",       name: "Colombo",            country: "LK", region: "neighbours", zone: "coastal", lat: 6.9271,  lon: 79.8612, elevation_m: 7, st: "Western" }
   ];
 
   var REGIONS = [
