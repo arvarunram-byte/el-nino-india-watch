@@ -21,6 +21,7 @@ edited without touching code.
 | **Climate change** | CMIP6 1961–2050 warming rate, anomaly vs 1961–90, projected 2046–50, rainfall change | Open-Meteo Climate | static archive |
 | **Pacific detail** | Official Niño-box departures + live 30-day SST curves for all four boxes | NOAA CPC + Open-Meteo Marine | weekly / hourly |
 | **Briefing** | Plain-language seasonal read-out in English plus eight Indian languages | written here, translated by Sarvam | static per ENSO update |
+| **Verification** | Each station's modelled rain checked against the satellite pixel above it, plus five pipeline self-tests | IMERG pixels + internal | per poll |
 | **Data** | Feed inventory, backend status, feedback form | — | — |
 
 Everything re-polls **every 60 seconds**.
@@ -49,6 +50,31 @@ console says so rather than implying otherwise:
 The header clock is the page's poll, not the age of the pixels. Each panel states its own freshness.
 
 ---
+
+## Verification — the part most dashboards skip
+
+A number on a dashboard is a claim. This console tries to make its claims falsifiable.
+
+**Satellite cross-check.** For every station the page computes which IMERG tile and which pixel
+covers its coordinates, loads that tile with `crossOrigin="anonymous"` (NASA GIBS sends
+`Access-Control-Allow-Origin: *`, so the canvas is readable), and reads the actual RGBA value the
+satellite painted there. That pixel is classified against the IMERG colour ramp — clear, light,
+moderate, heavy, very heavy — and compared with the forecast model's hourly rain **at the same
+granule timestamp**. Where the model says rain and the satellite's pixel is transparent, the row
+reads `differs`. That is the point: disagreement is information.
+
+**Five integrity checks** run on every poll, in the browser, against the data already in memory:
+
+1. *Station geometry* — every station inside the 0–40 °N, 55–100 °E box.
+2. *Series completeness* — 19 × 99 daily values, no gaps.
+3. *Physical bounds* — minimum never above maximum on any day.
+4. *Arithmetic re-check* — the 7-day total recomputed from the daily values, not trusted.
+5. *Freshness* — every station updated within 36 hours.
+
+What this does **not** prove: that IMERG is right. It proves the two independent chains
+(model forecast, satellite retrieval) agree or disagree at a known place and time, and it proves
+the arithmetic between what the API returned and what the page displays. Those are different
+claims and the panel keeps them separate.
 
 ## Architecture
 
@@ -152,6 +178,8 @@ Region filters and the station drawer are also linkable: `?region=south`.
 - **Open-Meteo** — weather, marine and CMIP6 climate APIs (CC-BY 4.0).
 - **NASA GIBS / IMERG / MODIS** — satellite imagery (NASA, public domain).
 - **NOAA Climate Prediction Center** — RONI, Niño departures, ENSO alert status and outlook.
+- **Browserbase** — used to fetch the deployed page from outside the build environment, as an
+  external check that the published site serves what the repository contains.
 - **Sarvam** — translation of the briefing into Hindi, Bengali, Marathi, Gujarati, Tamil, Telugu,
   Kannada and Malayalam. The English text is written for this console from the CPC record; the
   translations say the same thing and carry the same caveat.
