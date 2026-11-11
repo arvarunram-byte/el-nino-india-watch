@@ -1342,6 +1342,97 @@
     });
   }
 
+  /* ── groundwater: the soil column, shallow to deep ───────────────────── */
+  function soilColor(v) {
+    if (!num(v)) return "var(--faint)";
+    if (v < 0.12) return "var(--heat)";
+    if (v < 0.25) return "#c9a15f";
+    return "var(--cool)";
+  }
+
+  function renderGround() {
+    var all = state.water || [];
+    if (!all.length) return;
+    var rows = all.filter(function (r) { return state.region === "all" || r.c.region === state.region; });
+    if (!rows.length) return;
+
+    var meanDeep = mean(rows.map(function (r) { return r.layers[3]; }).filter(num));
+    var trend = mean(rows.map(function (r) { return r.deepDelta; }).filter(num));
+    var dry = rows.filter(function (r) { return num(r.layers[3]); })
+      .sort(function (a, b) { return a.layers[3] - b.layers[3]; })[0];
+    var up = rows.filter(function (r) { return num(r.deepDelta) && r.deepDelta > 0; }).length;
+
+    setHTML("gDeep", (num(meanDeep) ? fx(meanDeep * 100, 1) : "—") + "<small> %vol</small>");
+    setHTML("gTrend", sgn(trend * 100, 1) + "<small> pts</small>");
+    setText("gDry", dry ? dry.c.name : "—");
+    setText("gDryS", dry ? fx(dry.layers[3] * 100, 1) + "% deep · " + (stateOf(dry.c) || dry.c.country) : "deep layer");
+    setHTML("gUp", up + "<small> / " + rows.length + "</small>");
+    setText("groundMeta", rows.length + " stations · 30-day change");
+
+    var host = $("#groundList");
+    if (!host) return;
+    host.innerHTML = rows.filter(function (r) { return r.layers.some(num); })
+      .sort(function (a, b) { return (a.layers[3] || 9) - (b.layers[3] || 9); })
+      .slice(0, 16)
+      .map(function (r) {
+        var segs = r.layers.map(function (v) {
+          var pct = clamp((num(v) ? v : 0) * 200, 1, 100);
+          return '<span class="grow__b"><i style="width:' + pct + "%;background:" + soilColor(v) + '"></i></span>';
+        }).join("");
+        return '<div class="grow">'
+          + '<span class="grow__n">' + esc(r.c.name) + "</span>"
+          + segs
+          + '<span class="grow__v" style="color:' + soilColor(r.layers[3]) + '">'
+          + (num(r.layers[3]) ? fx(r.layers[3] * 100, 0) + "%" : "—") + "</span></div>";
+      }).join("");
+  }
+
+  /* ── air quality ─────────────────────────────────────────────────────── */
+  function loadAirQuality() {
+    var c = stationCoords();
+    return getJSON("https://air-quality-api.open-meteo.com/v1/air-quality?latitude=" + c.lat + "&longitude=" + c.lon
+      + "&current=pm2_5,pm10,aerosol_optical_depth,dust&timezone=Asia%2FKolkata", 25000)
+      .then(function (j) { return Array.isArray(j) ? j : [j]; });
+  }
+
+  function renderAirQuality(arr) {
+    state.air = state.stations.map(function (c, i) {
+      var cur = (arr[i] && arr[i].current) || {};
+      var rec = state.byId[c.id];
+      return {
+        c: c,
+        pm: num(cur.pm2_5) ? cur.pm2_5 : NaN,
+        aod: num(cur.aerosol_optical_depth) ? cur.aerosol_optical_depth : NaN,
+        hum: rec && num(rec.rh) ? rec.rh : NaN
+      };
+    });
+    paintAir();
+  }
+
+  function paintAir() {
+    var all = state.air || [];
+    if (!all.length) return;
+    var rows = all.filter(function (r) { return state.region === "all" || r.c.region === state.region; });
+    if (!rows.length) return;
+
+    setHTML("aPm", fx(mean(rows.map(function (r) { return r.pm; }).filter(num)), 0) + "<small> μg/m³</small>");
+    setHTML("aHum", fx(mean(rows.map(function (r) { return r.hum; }).filter(num)), 0) + "<small> %</small>");
+
+    var host = $("#airList");
+    if (!host) return;
+    host.innerHTML = rows.filter(function (r) { return num(r.pm); })
+      .sort(function (a, b) { return b.pm - a.pm; })
+      .slice(0, 8)
+      .map(function (r) {
+        var col = r.pm > 100 ? "var(--enso)" : r.pm > 60 ? "var(--heat)" : r.pm > 30 ? "#c9a15f" : "var(--climate)";
+        return '<div class="wind">'
+          + '<span class="wind__a" style="color:' + col + '">●</span>'
+          + '<span class="wind__n">' + esc(r.c.name) + "</span>"
+          + '<span class="wind__v" style="color:' + col + '">' + fx(r.pm, 0) + "</span>"
+          + '<span class="wind__c">' + (num(r.hum) ? fx(r.hum, 0) + "%" : "—") + "</span></div>";
+      }).join("");
+  }
+
   /* ── Indian-script station search ────────────────────────────────────── */
   function buildAliases() {
     state.alias = {};
@@ -1452,7 +1543,7 @@
   function loadWater() {
     var c = stationCoords();
     return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + c.lat + "&longitude=" + c.lon
-      + "&daily=soil_moisture_0_to_7cm_mean,soil_moisture_28_to_100cm_mean,et0_fao_evapotranspiration,precipitation_sum"
+      + "&daily=soil_moisture_0_to_7cm_mean,soil_moisture_7_to_28cm_mean,soil_moisture_28_to_100cm_mean,soil_moisture_100_to_255cm_mean,et0_fao_evapotranspiration,precipitation_sum"
       + "&past_days=30&forecast_days=1&timezone=Asia%2FKolkata", 30000)
       .then(function (j) { return Array.isArray(j) ? j : [j]; });
   }
@@ -1468,6 +1559,12 @@
     var rows = state.stations.map(function (c, i) {
       var w = wArr[i] || {}, d = w.daily || {};
       var soil = (d.soil_moisture_28_to_100cm_mean || []).map(function (v) { return num(v) ? v : NaN; });
+      var L = [
+        (d.soil_moisture_0_to_7cm_mean || []).map(function (v) { return num(v) ? v : NaN; }),
+        (d.soil_moisture_7_to_28cm_mean || []).map(function (v) { return num(v) ? v : NaN; }),
+        soil,
+        (d.soil_moisture_100_to_255cm_mean || []).map(function (v) { return num(v) ? v : NaN; })
+      ];
       var rain = (d.precipitation_sum || []).map(function (v) { return num(v) ? v : 0; });
       var et = (d.et0_fao_evapotranspiration || []).map(function (v) { return num(v) ? v : 0; });
       var r = rArr[i] || {}, rd = r.daily || {};
@@ -1476,8 +1573,12 @@
       var qMean = mean(q.slice(0, 30).filter(num));
       var soilNow = soil.length > 1 ? soil[soil.length - 2] : NaN;
       var soilStart = soil.length ? soil[0] : NaN;
+      var pick = function (a) { return a.length > 1 ? a[a.length - 2] : NaN; };
+      var dNow = pick(L[3]), dStart = L[3].length ? L[3][0] : NaN;
       return {
         c: c,
+        layers: L.map(pick),
+        deepDelta: (num(dNow) && num(dStart)) ? dNow - dStart : NaN,
         bal: sum(rain) - sum(et),
         soil: soilNow,
         dSoil: (num(soilNow) && num(soilStart)) ? soilNow - soilStart : NaN,
@@ -1487,6 +1588,7 @@
     });
     state.water = rows;
     paintWater();
+    renderGround();
   }
 
   function paintWater() {
@@ -1982,6 +2084,9 @@
             renderWater(res[0].status === "fulfilled" ? res[0].value : [],
                         res[1].status === "fulfilled" ? res[1].value : []);
           });
+          loadAirQuality().then(renderAirQuality).catch(function () {
+            setText("aPm", "n/a");
+          });
         }
       } else {
         setText("stationCount", "feed unavailable");
@@ -2042,6 +2147,8 @@
       renderHeat(rows);
       renderAir(rows);
       paintWater();
+      renderGround();
+      paintAir();
       setText("stationCount", rows.length + " of " + state.rows.length + " stations");
     }
     renderMap();

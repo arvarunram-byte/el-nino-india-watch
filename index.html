@@ -40,6 +40,7 @@
       <a href="#p-climate">Climate</a>
       <a href="#p-pacific">Pacific</a>
       <a href="#p-water">Water</a>
+      <a href="#p-ground">Ground</a>
       <a href="#p-air">Air</a>
       <a href="#p-brief">Briefing</a>
       <a href="#p-verify">Verify</a>
@@ -339,21 +340,51 @@
   </div>
 </section>
 
+<!-- ══ GROUNDWATER ════════════════════════════════════════════════════ -->
+<section class="panel" id="p-ground">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">07</span><span class="dot dot--ground"></span><h2>Underground water — the soil column</h2></div>
+    <div class="panel__meta" id="groundMeta">water content by depth, to 2.55 m</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Deep store · 1–2.5 m</div><div class="kpi__v" id="gDeep">—</div><div class="kpi__s">%vol, region mean</div></div>
+      <div class="kpi"><div class="kpi__k">30-day change</div><div class="kpi__v" id="gTrend">—</div><div class="kpi__s">deep layer</div></div>
+      <div class="kpi"><div class="kpi__k">Driest column</div><div class="kpi__v kpi__v--sm" id="gDry">—</div><div class="kpi__s" id="gDryS">deep layer</div></div>
+      <div class="kpi"><div class="kpi__k">Recharging</div><div class="kpi__v" id="gUp">—</div><div class="kpi__s">stations gaining water</div></div>
+    </div>
+    <div class="minih"><span>Water held in the ground, shallow → deep</span><span class="mono">0–7 · 7–28 · 28–100 · 100–255 cm</span></div>
+    <div class="glist" id="groundList"><div class="loading">Reading the soil column…</div></div>
+    <p class="footnote">
+      Four soil layers from the ECMWF/ERA5 land surface, expressed as volumetric water content —
+      how much of each layer is water. This is the column that groundwater recharge moves through,
+      and its direction of travel is a genuine recharge signal. It is <b>not</b> a water-table depth:
+      for measured levels in observation wells, the Central Ground Water Board is the authority.
+      A falling deep layer with a negative rain-minus-evaporation balance is the pattern to watch.
+    </p>
+  </div>
+</section>
+
 <!-- ══ AIR ════════════════════════════════════════════════════════════ -->
 <section class="panel" id="p-air">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">07</span><span class="dot dot--air"></span><h2>Air movement</h2></div>
-    <div class="panel__meta">10 m wind · direction &amp; speed</div>
+    <div class="panel__title"><span class="idx">08</span><span class="dot dot--air"></span><h2>Air — movement, moisture, quality</h2></div>
+    <div class="panel__meta">wind · humidity · PM2.5</div>
   </div>
   <div class="panel__body">
     <div class="kpis">
       <div class="kpi"><div class="kpi__k">Mean wind</div><div class="kpi__v" id="aMean">—</div><div class="kpi__s">km/h</div></div>
       <div class="kpi"><div class="kpi__k">Strongest</div><div class="kpi__v kpi__v--sm" id="aMax">—</div><div class="kpi__s" id="aMaxS">station</div></div>
       <div class="kpi"><div class="kpi__k">Prevailing</div><div class="kpi__v kpi__v--sm" id="aDir">—</div><div class="kpi__s">blowing from</div></div>
+      <div class="kpi"><div class="kpi__k">Humidity</div><div class="kpi__v" id="aHum">—</div><div class="kpi__s">% mean</div></div>
+      <div class="kpi"><div class="kpi__k">PM2.5</div><div class="kpi__v" id="aPm">—</div><div class="kpi__s">μg/m³ mean</div></div>
     </div>
     <div class="hlist" id="windList"><div class="loading">Loading wind…</div></div>
+    <div class="minih" style="margin-top:2px"><span>Particulate load &amp; moisture</span><span class="mono">PM2.5 μg/m³ · RH %</span></div>
+    <div class="hlist" id="airList"><div class="loading">Reading air quality…</div></div>
     <p class="footnote">
-      Wind is the ECMWF 10-metre field, not a satellite scatterometer retrieval. Watch the arrows:
+      Wind is the ECMWF 10-metre field, not a satellite scatterometer retrieval. PM2.5 is the CAMS
+      global aerosol model; the aerosol optical depth beside it is the satellite-retrieved column. Watch the arrows:
       during the north-east monsoon the peninsula should carry air from the north-east, while the
       Gangetic plain turns light and variable.
     </p>
@@ -363,7 +394,7 @@
 <!-- ══ BRIEFING ═══════════════════════════════════════════════════════ -->
 <section class="panel panel--brief" id="p-brief">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">08</span><span class="dot dot--brief"></span><h2>Briefing</h2></div>
+    <div class="panel__title"><span class="idx">09</span><span class="dot dot--brief"></span><h2>Briefing</h2></div>
     <div class="panel__meta">written &amp; translated by Sarvam</div>
   </div>
   <div class="panel__body">
@@ -383,7 +414,7 @@
 <!-- ══ VERIFICATION ═══════════════════════════════════════════════════ -->
 <section class="panel" id="p-verify">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">09</span><span class="dot dot--verify"></span><h2>Verification</h2></div>
+    <div class="panel__title"><span class="idx">10</span><span class="dot dot--verify"></span><h2>Verification</h2></div>
     <div class="panel__meta" id="verifyMeta">cross-checking the model against satellite pixels</div>
   </div>
   <div class="panel__body">
@@ -405,7 +436,7 @@
 <!-- ══ DATA ═══════════════════════════════════════════════════════════ -->
 <section class="panel" id="p-data">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">10</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
+    <div class="panel__title"><span class="idx">11</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
     <div class="panel__meta" id="backendMeta">checking backend…</div>
   </div>
   <div class="panel__body">
