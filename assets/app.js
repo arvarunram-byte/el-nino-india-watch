@@ -235,6 +235,7 @@
       threshold: thr,
       precip: p,
       tmax: tmax,
+      tmin: tmin,
       times: times,
       fcstRain: p.slice(93, 100),
       fcstMax: tmax.slice(93, 100),
@@ -1128,6 +1129,194 @@
     setText("briefAttrib", it.label + " · " + (it.translated ? "translated by Sarvam" : "written by Sarvam"));
   }
 
+  /* ── verification: read the satellite's own pixels ───────────────────── */
+  var VZ = 6;
+  var tileCache = {};
+
+  function pixelTarget(lat, lon, z) {
+    var world = 256 * Math.pow(2, z);
+    var x = (lon + 180) / 360 * world;
+    var y = latNorm(lat) * world;
+    var tx = Math.floor(x / 256), ty = Math.floor(y / 256);
+    return {
+      tx: tx, ty: ty,
+      px: clamp(Math.floor(x - tx * 256), 0, 255),
+      py: clamp(Math.floor(y - ty * 256), 0, 255)
+    };
+  }
+
+  function readTile(url) {
+    if (!tileCache[url]) {
+      tileCache[url] = new Promise(function (resolve) {
+        var img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function () {
+          try {
+            var c = document.createElement("canvas");
+            c.width = 256; c.height = 256;
+            var ctx = c.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            resolve(ctx.getImageData(0, 0, 256, 256).data);
+          } catch (e) { resolve(null); }
+        };
+        img.onerror = function () { resolve(null); };
+        img.src = url;
+      });
+    }
+    return tileCache[url];
+  }
+
+  // GIBS IMERG paints dry areas transparent and rain in a blue→green→yellow→red ramp.
+  function classifyPixel(r, g, b, a) {
+    if (a < 70) return { wet: false, cls: "clear" };
+    if (r > 170 && g < 130 && b < 130) return { wet: true, cls: "very heavy" };
+    if (r > 200 && g > 180 && b < 120) return { wet: true, cls: "heavy" };
+    if (r > 170 && g > 120 && b < 120) return { wet: true, cls: "moderate" };
+    if (g > 120 && r < 120) return { wet: true, cls: "moderate" };
+    if (b > 110) return { wet: true, cls: "light" };
+    return { wet: true, cls: "light" };
+  }
+
+  function loadVerifyHourly() {
+    var lat = state.stations.map(function (c) { return c.lat; }).join(",");
+    var lon = state.stations.map(function (c) { return c.lon; }).join(",");
+    return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
+      + "&hourly=precipitation&past_days=2&forecast_days=1&timezone=GMT", 22000)
+      .then(function (j) { return Array.isArray(j) ? j : [j]; });
+  }
+
+  function runVerification() {
+    if (!state.frames || !state.frames.length || state.layer !== "precip") return;
+    var when = state.frames[state.frames.length - 1];
+    var hourKey = when.toISOString().slice(0, 13);
+
+    loadVerifyHourly().then(function (arr) {
+      var jobs = state.stations.map(function (c, i) {
+        var d = arr[i];
+        var modelMm = NaN;
+        if (d && d.hourly && d.hourly.time) {
+          var idx = -1;
+          for (var k = 0; k < d.hourly.time.length; k++) {
+            if (d.hourly.time[k].slice(0, 13) === hourKey) { idx = k; break; }
+          }
+          if (idx >= 0) modelMm = d.hourly.precipitation[idx];
+        }
+        var t = pixelTarget(c.lat, c.lon, VZ);
+        var url = GIBS + "/IMERG_Precipitation_Rate_30min/default/" + isoGranule(when)
+          + "/GoogleMapsCompatible_Level6/" + VZ + "/" + t.ty + "/" + t.tx + ".png";
+        return readTile(url).then(function (data) {
+          if (!data) return { c: c, modelMm: modelMm, sat: null, ok: null };
+          var i2 = (t.py * 256 + t.px) * 4;
+          var sat = classifyPixel(data[i2], data[i2 + 1], data[i2 + 2], data[i2 + 3]);
+          var modelWet = isFinite(modelMm) && modelMm > 0.1;
+          return { c: c, modelMm: modelMm, sat: sat, ok: isFinite(modelMm) ? (modelWet === sat.wet) : null };
+        });
+      });
+      return Promise.all(jobs);
+    }).then(function (rows) {
+      renderVerify(rows, when);
+    }).catch(function () {
+      setText("verifyMeta", "satellite cross-check unavailable");
+    });
+  }
+
+  function renderVerify(rows, when) {
+    var scored = rows.filter(function (r) { return r.ok !== null; });
+    var agree = scored.filter(function (r) { return r.ok; }).length;
+    var pct = scored.length ? Math.round((agree / scored.length) * 100) : NaN;
+
+    setHTML("vAgree", agree + "<small> / " + scored.length + "</small>");
+    setText("vAgreeS", "at " + when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC granule");
+    setHTML("vPct", (isFinite(pct) ? pct : "—") + "<small> %</small>");
+    setText("verifyMeta", "IMERG pixels vs model · " + isoGranule(when));
+
+    var host = $("#verifyList");
+    if (host) {
+      host.innerHTML = rows.map(function (r) {
+        var tag = r.ok === null ? '<span class="vcell__s v-na">n/a</span>'
+          : r.ok ? '<span class="vcell__s v-ok">match</span>'
+          : '<span class="vcell__s v-no">differs</span>';
+        var modelTxt = isFinite(r.modelMm) ? fx(r.modelMm, 1) + " mm" : "—";
+        var satTxt = r.sat ? (r.sat.wet ? r.sat.cls : "clear") : "—";
+        return '<div class="vcell">'
+          + '<span class="vcell__n">' + esc(r.c.name) + "</span>"
+          + '<span class="vcell__m">' + modelTxt + " · " + satTxt + "</span>"
+          + tag + "</div>";
+      }).join("");
+    }
+
+    renderChecks();
+  }
+
+  function renderChecks() {
+    var rows = state.rows || [];
+    var out = [];
+
+    var badGeo = state.stations.filter(function (c) {
+      return !(c.lat >= 0 && c.lat <= 40 && c.lon >= 55 && c.lon <= 100);
+    });
+    out.push({
+      pass: badGeo.length === 0,
+      t: "Station geometry",
+      d: badGeo.length ? badGeo.length + " outside the India + neighbourhood box"
+        : "all " + state.stations.length + " inside 0–40°N, 55–100°E"
+    });
+
+    var badLen = rows.filter(function (r) { return !r.times || r.times.length !== 99; });
+    out.push({
+      pass: rows.length > 0 && badLen.length === 0,
+      t: "Series completeness",
+      d: rows.length ? (badLen.length ? badLen.length + " with a short series" : rows.length + " × 99 daily values, no gaps")
+        : "no rows yet"
+    });
+
+    var badOrder = rows.filter(function (r) {
+      for (var i = 0; i < r.tmax.length; i++) {
+        if (isFinite(r.tmax[i]) && isFinite(r.tmin[i]) && r.tmax[i] < r.tmin[i]) return true;
+      }
+      return false;
+    });
+    out.push({
+      pass: rows.length > 0 && badOrder.length === 0,
+      t: "Physical bounds",
+      d: badOrder.length ? badOrder.length + " stations with min above max" : "min ≤ max on every day"
+    });
+
+    var badSum = rows.filter(function (r) {
+      var recomputed = sum(r.precip.slice(86, 93));
+      return Math.abs(recomputed - r.p7) > 0.05;
+    });
+    out.push({
+      pass: rows.length > 0 && badSum.length === 0,
+      t: "Arithmetic re-check",
+      d: badSum.length ? badSum.length + " mismatched 7-day totals" : "7-day totals recomputed from daily values"
+    });
+
+    var now = Date.now();
+    var stale = rows.filter(function (r) {
+      var t = r.times && r.times[92] ? new Date(r.times[92] + "T12:00:00") : null;
+      return t ? Math.abs(now - t.getTime()) > 36 * 3600e3 : true;
+    });
+    out.push({
+      pass: rows.length > 0 && stale.length === 0,
+      t: "Freshness",
+      d: stale.length ? stale.length + " stations stale beyond 36 h" : "every station updated today"
+    });
+
+    var passed = out.filter(function (o) { return o.pass; }).length;
+    setHTML("vChecks", passed + "<small> / " + out.length + "</small>");
+    setText("vChecksS", passed === out.length ? "all pipeline self-tests pass" : "see failing checks");
+
+    var host = $("#verifyChecks");
+    if (host) {
+      host.innerHTML = out.map(function (o) {
+        return '<div class="chk ' + (o.pass ? "chk--pass" : "chk--fail") + '">'
+          + '<span class="chk__m">' + (o.pass ? "✓" : "✕") + "</span>"
+          + "<span><b>" + esc(o.t) + "</b>" + esc(o.d) + "</span></div>";
+      }).join("");
+    }
+  }
+
   /* ── drawer ──────────────────────────────────────────────────────────── */
   function openStation(id) {
     var r = state.byId[id];
@@ -1339,6 +1528,7 @@
         renderHeat(rows);
         renderMap();
         setText("stationCount", rows.length + " of " + state.rows.length + " stations");
+        if (initial || state.cycle % 5 === 1) runVerification();
       } else {
         setText("stationCount", "feed unavailable");
         var body = $("#rainBody");

@@ -40,6 +40,7 @@
       <a href="#p-climate">Climate</a>
       <a href="#p-pacific">Pacific</a>
       <a href="#p-brief">Briefing</a>
+      <a href="#p-verify">Verify</a>
       <a href="#p-data">Data</a>
     </nav>
 
@@ -307,10 +308,32 @@
   </div>
 </section>
 
+<!-- ══ VERIFICATION ═══════════════════════════════════════════════════ -->
+<section class="panel" id="p-verify">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">07</span><span class="dot dot--verify"></span><h2>Verification</h2></div>
+    <div class="panel__meta" id="verifyMeta">cross-checking the model against satellite pixels</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Satellite confirms</div><div class="kpi__v" id="vAgree">—</div><div class="kpi__s" id="vAgreeS">stations at the granule hour</div></div>
+      <div class="kpi"><div class="kpi__k">Agreement</div><div class="kpi__v" id="vPct">—</div><div class="kpi__s">model vs pixels</div></div>
+      <div class="kpi"><div class="kpi__k">Integrity checks</div><div class="kpi__v" id="vChecks">—</div><div class="kpi__s" id="vChecksS">pipeline self-tests</div></div>
+    </div>
+    <div class="vgrid" id="verifyList"><div class="loading">Sampling satellite pixels…</div></div>
+    <div class="checks" id="verifyChecks"></div>
+    <p class="footnote" id="verifyNote">
+      The left column is the forecast model's hourly rain at the granule's own timestamp. The right
+      column is what the IMERG satellite pixel over that station actually shows, read directly from
+      the image the map is drawing. Where they disagree, one of them is wrong — that is the point.
+    </p>
+  </div>
+</section>
+
 <!-- ══ DATA ═══════════════════════════════════════════════════════════ -->
 <section class="panel" id="p-data">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">07</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
+    <div class="panel__title"><span class="idx">08</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
     <div class="panel__meta" id="backendMeta">checking backend…</div>
   </div>
   <div class="panel__body">
