@@ -29,7 +29,11 @@
     rows: [],
     byId: {},
     layer: "precip",
-    sceneOffset: 1,
+    view: "india",
+    span: 12,
+    frame: 11,
+    playing: false,
+    lang: "en",
     cycle: 0,
     busy: false,
     nextTick: POLL_SECONDS,
@@ -764,7 +768,7 @@
     }
   }
 
-  /* ── map ─────────────────────────────────────────────────────────────── */
+  /* ── map: projection, extent, layers ─────────────────────────────────── */
   var latNorm = function (lat) {
     var r = clamp(lat, -85, 85) * Math.PI / 180;
     return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2;
@@ -773,124 +777,268 @@
   var lonFromX = function (x) { return x * 360 - 180; };
   var GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best";
 
-  function mapView(W, H) {
+  var VIEWS = {
+    india: { centerLat: 20.5, centerLon: 79.0 },
+    world: { centerLat: 12.0, centerLon: 0.0 }
+  };
+
+  // the map is derived from the box it has to fill, so it never letterboxes
+  function viewGeom(W, H) {
+    if (state.view === "world") {
+      var wz = 3;
+      var wWorld = 256 * Math.pow(2, wz);
+      var ws = W / wWorld;                       // globe fitted to the width
+      var wy = latNorm(VIEWS.world.centerLat) * wWorld - (H / ws) / 2;
+      return {
+        z: wz, s: ws, world: wWorld, xPix: 0, yPix: wy,
+        west: -180, east: 180,
+        north: latFromNorm(wy / wWorld),
+        south: latFromNorm((wy + H / ws) / wWorld)
+      };
+    }
     var z = (H >= 600 && W >= 700) ? 5 : 4;
     var world = 256 * Math.pow(2, z);
-    var nx = (REF.MAP_CENTRE.lon + 180) / 360;
-    var ny = latNorm(REF.MAP_CENTRE.lat);
+    var nx = (VIEWS.india.centerLon + 180) / 360;
+    var ny = latNorm(VIEWS.india.centerLat);
     var xLeft = nx - (W / world) / 2;
     var yTop = ny - (H / world) / 2;
     return {
-      z: z, world: world, xLeft: xLeft, yTop: yTop,
-      w: lonFromX(xLeft), e: lonFromX(xLeft + W / world),
-      n: latFromNorm(yTop), s: latFromNorm(yTop + H / world)
+      z: z, s: 1, world: world, xPix: xLeft * world, yPix: yTop * world,
+      west: lonFromX(xLeft), east: lonFromX(xLeft + W / world),
+      north: latFromNorm(yTop), south: latFromNorm(yTop + H / world)
     };
   }
 
   var LAYERS = {
     precip: {
       maxZ: 6,
-      url: function (z, y, x, d) { return GIBS + "/IMERG_Precipitation_Rate_30min/default/" + d + "/GoogleMapsCompatible_Level6/" + z + "/" + y + "/" + x + ".png"; },
-      opacity: 0.8,
+      step: "IMERG_Precipitation_Rate_30min",
+      tileset: "GoogleMapsCompatible_Level6",
+      opacity: 0.82,
       label: "IMERG precipitation rate",
-      note: "NASA IMERG 30-minute precipitation-rate mosaic. Granules land with roughly 6–12 hours of latency, so the newest usable scene is usually yesterday."
+      note: "NASA IMERG 30-minute precipitation-rate mosaic. Granules land with roughly 6–12 hours of latency, so the loop ends a few hours behind now."
     },
     lst: {
       maxZ: 7,
-      url: function (z, y, x, d) { return GIBS + "/MODIS_Terra_Land_Surface_Temp_Day/default/" + d + "/GoogleMapsCompatible_Level7/" + z + "/" + y + "/" + x + ".png"; },
-      opacity: 0.75,
+      step: "MODIS_Terra_Land_Surface_Temp_Day",
+      tileset: "GoogleMapsCompatible_Level7",
+      opacity: 0.78,
       label: "MODIS land-surface temperature",
-      note: "MODIS Terra daytime land-surface temperature, daily composite — the skin of the ground, which runs far hotter than the air above it."
+      note: "MODIS Terra daytime land-surface temperature, one composite per day — the skin of the ground, which runs far hotter than the air above it."
     },
-    none: { maxZ: 9, url: null, opacity: 0, label: "Bare chart", note: "Coastlines and station markers only." }
+    none: { maxZ: 9, step: null, tileset: null, opacity: 0, label: "Bare chart", note: "Coastlines and station markers only." }
   };
 
-  function sceneDate() {
-    var d = new Date();
-    d.setUTCDate(d.getUTCDate() - state.sceneOffset);
-    return d.toISOString().slice(0, 10);
+  var FRAMES = 12;
+
+  function isoGranule(d) { return d.toISOString().replace(".000", ""); }
+  function isoDay(d) { return d.toISOString().slice(0, 10); }
+
+  // 12 frames ending a few hours behind now — the satellite's own clock
+  function loopFrames() {
+    var isLst = state.layer === "lst";
+    var stepMin = isLst ? 1440 : Math.round((state.span * 60) / FRAMES);
+    var end = new Date(Date.now() - (isLst ? 36 : 8) * 3600e3);
+    if (isLst) end.setUTCHours(12, 0, 0, 0);
+    else end.setUTCMinutes(Math.floor(end.getUTCMinutes() / 30) * 30, 0, 0);
+
+    var out = [];
+    for (var i = FRAMES - 1; i >= 0; i--) out.push(new Date(end.getTime() - i * stepMin * 60e3));
+    return out;
   }
 
-  function renderMap() {
-    var host = $("#mapTiles"), svg = $("#mapSvg");
-    if (!host || !svg) return;
-    var W = host.clientWidth, H = host.clientHeight;
-    if (!W || !H) return;
+  function layerTileURL(cfg, z, ty, tx, d) {
+    var when = cfg.step === "IMERG_Precipitation_Rate_30min" ? isoGranule(d) : isoDay(d);
+    return GIBS + "/" + cfg.step + "/default/" + when + "/" + cfg.tileset + "/" + z + "/" + ty + "/" + tx + ".png";
+  }
 
-    var V = mapView(W, H);
-    var cfg = LAYERS[state.layer] || LAYERS.none;
-    var date = sceneDate();
-    var lz = Math.min(V.z, cfg.maxZ);
+  function tilesHTML(g, cfg, d, lazy) {
+    var W = $("#mapTiles").clientWidth, H = $("#mapTiles").clientHeight;
+    var xPix = g.xPix, yPix = g.yPix;
+    var maxTile = Math.pow(2, g.z) - 1;
+    var tx0 = clamp(Math.floor(xPix / 256), 0, maxTile);
+    var tx1 = clamp(Math.floor((xPix + W / g.s) / 256), 0, maxTile);
+    var ty0 = clamp(Math.floor(yPix / 256), 0, maxTile);
+    var ty1 = clamp(Math.floor((yPix + H / g.s) / 256), 0, maxTile);
+    var size = (256 * g.s).toFixed(1);
+    var out = [];
 
-    var xPix = V.xLeft * V.world, yPix = V.yTop * V.world;
-    var tx0 = Math.floor(xPix / 256), tx1 = Math.floor((xPix + W) / 256);
-    var ty0 = Math.floor(yPix / 256), ty1 = Math.floor((yPix + H) / 256);
-
-    var tiles = [];
     for (var ty = ty0; ty <= ty1; ty++) {
       for (var tx = tx0; tx <= tx1; tx++) {
-        var left = (tx * 256 - xPix).toFixed(1), top = (ty * 256 - yPix).toFixed(1);
-        tiles.push('<img src="' + GIBS + "/Coastlines/default/2020-01-01/GoogleMapsCompatible_Level9/" + V.z + "/" + ty + "/" + tx
-          + '.png" style="left:' + left + "px;top:" + top + 'px;opacity:.85;filter:invert(1) saturate(0) brightness(1.35)" alt="" loading="lazy">');
-        if (cfg.url) {
-          tiles.push('<img src="' + cfg.url(lz, ty, tx, date) + '" style="left:' + left + "px;top:" + top
-            + "px;opacity:" + cfg.opacity + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">');
+        var left = ((tx * 256 - xPix) * g.s).toFixed(1);
+        var top = ((ty * 256 - yPix) * g.s).toFixed(1);
+        var geo = 'left:' + left + 'px;top:' + top + 'px;width:' + size + 'px;height:' + size + 'px';
+        if (!cfg) {
+          out.push('<img src="' + GIBS + "/Coastlines/default/2020-01-01/GoogleMapsCompatible_Level9/" + g.z + "/" + ty + "/" + tx
+            + '.png" style="' + geo + ';opacity:.85;filter:invert(1) saturate(0) brightness(1.35)" alt="" loading="lazy">');
+        } else {
+          var url = layerTileURL(cfg, Math.min(g.z, cfg.maxZ), ty, tx, d);
+          out.push('<img ' + (lazy ? 'data-src="' + url + '"' : 'src="' + url + '"') + ' style="' + geo
+            + ';opacity:' + cfg.opacity + '" alt="" onerror="this.style.display=\'none\'">');
         }
       }
     }
-    host.innerHTML = tiles.join("");
-    host.appendChild(svg);
+    return out.join("");
+  }
 
-    var px = function (lon) { return ((lon + 180) / 360 - V.xLeft) * V.world; };
-    var py = function (lat) { return (latNorm(lat) - V.yTop) * V.world; };
+  function renderMapBase(g) {
+    var base = $("#mapBase");
+    if (base) base.innerHTML = tilesHTML(g, null, null, false);
+  }
+
+  function renderFrames(g) {
+    var cfg = LAYERS[state.layer];
+    var host = $("#mapFrames");
+    if (!host) return;
+    state.frames = loopFrames();
+
+    if (!cfg || !cfg.step) { host.innerHTML = ""; return; }
+    host.innerHTML = state.frames.map(function (d, i) {
+      return '<div class="frame" data-i="' + i + '">' + tilesHTML(g, cfg, d, true) + "</div>";
+    }).join("");
+  }
+
+  function loadFrame(i) {
+    var f = document.querySelector('.frame[data-i="' + i + '"]');
+    if (!f || f.dataset.loaded === "1") return;
+    f.dataset.loaded = "1";
+    Array.prototype.forEach.call(f.querySelectorAll("img[data-src]"), function (img) {
+      img.src = img.getAttribute("data-src");
+    });
+  }
+
+  function activateFrame(i) {
+    if (!state.frames || !state.frames.length) return;
+    i = clamp(i, 0, state.frames.length - 1);
+    state.frame = i;
+
+    // load this frame and its neighbours, so playback never stalls
+    [i, i + 1, i - 1, i + 2].forEach(function (k) {
+      if (k >= 0 && k < state.frames.length) loadFrame(k);
+    });
+
+    $$(".frame").forEach(function (f) {
+      f.classList.toggle("is-on", +f.dataset.i === i);
+    });
+
+    var scrub = $("#scrub");
+    if (scrub) scrub.value = String(i);
+
+    var d = state.frames[i];
+    var isLst = state.layer === "lst";
+    var label = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+    if (!isLst) {
+      label += " · " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+    }
+    setText("frameStamp", label);
+
+    var loaded = $$(".frame[data-loaded='1']").length;
+    setText("loadState", state.playing ? "playing" : "frame " + (i + 1) + "/" + state.frames.length);
+    var hud = $("#mapHud");
+    if (hud) {
+      hud.innerHTML = "SCENE <b>" + label + "</b> · Z" + (state.geom ? state.geom.z : "") + " · "
+        + LAYERS[state.layer].label.toUpperCase()
+        + "<br>" + (state.geom ? state.geom.west.toFixed(0) + "°E–" + state.geom.east.toFixed(0) + "°E · "
+          + state.geom.south.toFixed(0) + "°N–" + state.geom.north.toFixed(0) + "°N" : "");
+    }
+  }
+
+  function renderMapSvg(g) {
+    var svg = $("#mapSvg"), host = $("#mapTiles");
+    if (!svg || !host) return;
+    var W = host.clientWidth, H = host.clientHeight;
+
+    var px = function (lon) { return ((lon + 180) / 360 * g.world - g.xPix) * g.s; };
+    var py = function (lat) { return (latNorm(lat) * g.world - g.yPix) * g.s; };
 
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     svg.setAttribute("width", W);
     svg.setAttribute("height", H);
 
-    var g = "";
-    for (var lon = Math.ceil(V.w / 10) * 10; lon <= V.e; lon += 10) {
-      g += '<line x1="' + px(lon).toFixed(1) + '" y1="0" x2="' + px(lon).toFixed(1) + '" y2="' + H
-        + '" stroke="rgba(180,200,215,.14)" stroke-width="1" stroke-dasharray="2 4"/>'
-        + '<text x="' + (px(lon) + 3).toFixed(1) + '" y="' + (H - 6)
-        + '" fill="rgba(180,200,215,.42)" font-family="JetBrains Mono, monospace" font-size="8">' + lon + "°E</text>";
+    var stepLon = state.view === "world" ? 30 : 10;
+    var stepLat = state.view === "world" ? 30 : 10;
+    var g0 = "";
+
+    for (var lon = Math.ceil(g.west / stepLon) * stepLon; lon <= g.east; lon += stepLon) {
+      var x = px(lon);
+      if (x < -2 || x > W + 2) continue;
+      g0 += '<line x1="' + x.toFixed(1) + '" y1="0" x2="' + x.toFixed(1) + '" y2="' + H
+        + '" stroke="rgba(180,200,215,.13)" stroke-width="1" stroke-dasharray="2 4"/>'
+        + '<text x="' + (x + 3).toFixed(1) + '" y="' + (H - 6)
+        + '" fill="rgba(180,200,215,.42)" font-family="JetBrains Mono, monospace" font-size="8">'
+        + (lon === 0 ? "0°" : Math.abs(lon) + "°" + (lon > 0 ? "E" : "W")) + "</text>";
     }
-    for (var lat = Math.ceil(V.s / 10) * 10; lat <= V.n; lat += 10) {
-      g += '<line x1="0" y1="' + py(lat).toFixed(1) + '" x2="' + W + '" y2="' + py(lat).toFixed(1)
-        + '" stroke="rgba(180,200,215,.14)" stroke-width="1" stroke-dasharray="2 4"/>'
-        + '<text x="4" y="' + (py(lat) - 4).toFixed(1)
-        + '" fill="rgba(180,200,215,.42)" font-family="JetBrains Mono, monospace" font-size="8">' + lat + "°N</text>";
+    for (var lat = Math.ceil(g.south / stepLat) * stepLat; lat <= g.north; lat += stepLat) {
+      var y = py(lat);
+      if (y < -2 || y > H + 2) continue;
+      var strong = lat === 0;
+      g0 += '<line x1="0" y1="' + y.toFixed(1) + '" x2="' + W + '" y2="' + y.toFixed(1)
+        + '" stroke="rgba(180,200,215,' + (strong ? ".28" : ".13") + ')" stroke-width="1" stroke-dasharray="2 4"/>'
+        + '<text x="4" y="' + (y - 4).toFixed(1)
+        + '" fill="rgba(180,200,215,.42)" font-family="JetBrains Mono, monospace" font-size="8">'
+        + (lat === 0 ? "Equator" : Math.abs(lat) + "°" + (lat > 0 ? "N" : "S")) + "</text>";
+    }
+
+    // the ENSO engine room, drawn only on the world view
+    if (state.view === "world") {
+      var boxes = [
+        { n: "Niño 4",   w: 160, e: 180, s: -5, t: 5 },
+        { n: "",         w: -180, e: -150, s: -5, t: 5 },
+        { n: "Niño 3.4", w: -170, e: -120, s: -5, t: 5 },
+        { n: "Niño 3",   w: -150, e: -90, s: -5, t: 5 },
+        { n: "Niño 1+2", w: -90, e: -80, s: -10, t: 0 }
+      ];
+      boxes.forEach(function (b) {
+        var x0 = px(b.w), x1 = px(b.e), y0 = py(b.t), y1 = py(b.s);
+        g0 += '<rect x="' + x0.toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + Math.max(1, (x1 - x0)).toFixed(1)
+          + '" height="' + Math.max(1, (y1 - y0)).toFixed(1)
+          + '" fill="rgba(208,83,63,.07)" stroke="rgba(208,83,63,.55)" stroke-width="1" stroke-dasharray="4 3"/>';
+        if (b.n) {
+          g0 += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="' + (y0 - 5).toFixed(1)
+            + '" fill="rgba(232,150,138,.95)" font-family="JetBrains Mono, monospace" font-size="8.5" text-anchor="middle"'
+            + ' style="paint-order:stroke;stroke:rgba(6,9,12,.9);stroke-width:2.6px">' + b.n + "</text>";
+        }
+      });
     }
 
     state.stations.forEach(function (c) {
-      if (c.lon < V.w || c.lon > V.e || c.lat < V.s || c.lat > V.n) return;
+      if (c.lon < g.west || c.lon > g.east || c.lat < g.south || c.lat > g.north) return;
       var cx = px(c.lon), cy = py(c.lat);
       var rec = state.byId[c.id];
       var dim = state.region !== "all" && c.region !== state.region;
-      var col = "#d8dee6", r = 2.9;
+      var col = "#d8dee6", r = state.view === "world" ? 2.4 : 2.9;
       if (rec) {
-        if (rec.today >= 7.6) { col = "#3fa9b8"; r = 4.4; }
-        else if (rec.tmaxToday >= 35) { col = "#e08a2e"; r = 4; }
-        else if (rec.tmaxToday >= 30) { col = "#c9a15f"; r = 3.3; }
+        if (rec.today >= 7.6) { col = "#3fa9b8"; r += 1.5; }
+        else if (rec.tmaxToday >= 35) { col = "#e08a2e"; r += 1.1; }
+        else if (rec.tmaxToday >= 30) { col = "#c9a15f"; r += 0.4; }
       }
       var op = dim ? 0.28 : 1;
-      g += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (r + 1.7) + '" fill="rgba(6,9,12,.6)" opacity="' + op + '"/>';
-      g += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + r + '" fill="' + col + '" opacity="' + op
+      g0 += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (r + 1.6) + '" fill="rgba(6,9,12,.6)" opacity="' + op + '"/>';
+      g0 += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + r + '" fill="' + col + '" opacity="' + op
         + '" data-station="' + c.id + '"><title>' + esc(c.name) + "</title></circle>";
-      if (c.country === "IN" && !dim) {
-        g += '<text x="' + (cx + 6).toFixed(1) + '" y="' + (cy + 3).toFixed(1)
+      if (c.country === "IN" && !dim && state.view === "india") {
+        g0 += '<text x="' + (cx + 6).toFixed(1) + '" y="' + (cy + 3).toFixed(1)
           + '" fill="rgba(232,238,244,.9)" font-family="JetBrains Mono, monospace" font-size="9"'
           + ' style="paint-order:stroke;stroke:rgba(6,9,12,.85);stroke-width:2.6px">' + esc(c.name) + "</text>";
       }
     });
-    svg.innerHTML = g;
+    svg.innerHTML = g0;
+  }
 
-    var hud = $("#mapHud");
-    if (hud) {
-      hud.innerHTML = "SCENE <b>" + date + "</b> · Z" + V.z + " · " + cfg.label.toUpperCase()
-        + "<br>" + V.w.toFixed(0) + "°E–" + V.e.toFixed(0) + "°E · " + V.s.toFixed(0) + "°N–" + V.n.toFixed(0) + "°N";
-    }
-    setText("sceneDate", date);
+  function renderMap() {
+    var host = $("#mapTiles");
+    if (!host) return;
+    var W = host.clientWidth, H = host.clientHeight;
+    if (!W || !H) return;
+
+    var g = viewGeom(W, H);
+    state.geom = g;
+    renderMapBase(g);
+    renderFrames(g);
+    renderMapSvg(g);
+
+    var last = state.frames && state.frames.length ? state.frames.length - 1 : 0;
+    activateFrame(state.frame === undefined ? last : clamp(state.frame, 0, last));
 
     var leg = $("#mapLegend");
     if (leg) {
@@ -906,9 +1054,78 @@
         leg.innerHTML = "<span>Coastlines · station markers only</span>";
       }
     }
+    var title = document.querySelector("#p-map h2");
+    if (title) title.textContent = state.view === "world" ? "Satellite view — world" : "Satellite view — India & surrounds";
+
     var note = $("#mapNote");
-    if (note) note.innerHTML = "<b>" + cfg.label + ".</b> " + cfg.note
-      + " Dots: cyan = wet (≥7.5 mm today), amber = hot (≥35 °C max), white = quiet. Click a dot to open the station.";
+    if (note) {
+      var cfg = LAYERS[state.layer];
+      var extra = state.view === "world"
+        ? " The dashed boxes are the four Niño monitoring regions — the engine room of El Niño."
+        : " Dots: cyan = wet (≥7.5 mm today), amber = hot (≥35 °C max), white = quiet. Click a dot for the station.";
+      note.innerHTML = "<b>" + cfg.label + ".</b> " + cfg.note + extra;
+    }
+  }
+
+  /* ── satellite loop controls ─────────────────────────────────────────── */
+  function startPlay() {
+    if (state.playing) return;
+    if (!state.frames || !state.frames.length) return;
+    state.playing = true;
+    var btn = $("#playBtn");
+    if (btn) btn.setAttribute("aria-pressed", "true");
+    var icon = $("#playIcon");
+    if (icon) icon.setAttribute("d", "M4 3h3.2v10H4zM8.8 3H12v10H8.8z");
+    state.timer = setInterval(function () {
+      var next = (state.frame + 1) % state.frames.length;
+      activateFrame(next);
+    }, 720);
+  }
+  function stopPlay() {
+    state.playing = false;
+    clearInterval(state.timer);
+    var btn = $("#playBtn");
+    if (btn) btn.setAttribute("aria-pressed", "false");
+    var icon = $("#playIcon");
+    if (icon) icon.setAttribute("d", "M4 2.5v11l9-5.5z");
+    setText("loadState", "frame " + ((state.frame || 0) + 1) + "/" + (state.frames ? state.frames.length : FRAMES));
+  }
+
+  /* ── briefing ────────────────────────────────────────────────────────── */
+  function renderBriefing() {
+    var B = window.ENI_BRIEFING;
+    var bar = $("#langBar");
+    if (!B || !bar) return;
+
+    var saved = store.get("eni.lang", "en");
+    if (!B.items[saved]) saved = "en";
+    state.lang = saved;
+
+    bar.innerHTML = B.order.map(function (code) {
+      var it = B.items[code];
+      return '<button class="lang" type="button" data-lang="' + code + '" aria-pressed="' + (code === saved) + '"'
+        + ' lang="' + code + '">' + esc(it.label) + "</button>";
+    }).join("");
+
+    applyBriefing(saved);
+  }
+
+  function applyBriefing(code) {
+    var B = window.ENI_BRIEFING;
+    if (!B || !B.items[code]) return;
+    var it = B.items[code];
+    state.lang = code;
+    store.set("eni.lang", code);
+
+    var el2 = $("#briefText");
+    if (el2) {
+      el2.setAttribute("lang", code);
+      el2.innerHTML = it.text.split("\n\n").map(function (p) { return "<p>" + esc(p) + "</p>"; }).join("");
+    }
+    $$(".lang").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.lang === code));
+    });
+    setText("briefAttrib", it.label + " · " + (it.translated ? "translated by Sarvam" : "written by Sarvam"));
   }
 
   /* ── drawer ──────────────────────────────────────────────────────────── */
@@ -1189,18 +1406,46 @@
     document.addEventListener("click", function (e) {
       var chip = e.target.closest(".chip[data-region]");
       if (chip) setRegion(chip.dataset.region);
+      var lang = e.target.closest(".lang[data-lang]");
+      if (lang) applyBriefing(lang.dataset.lang);
     });
 
     $$(".lbtn").forEach(function (b) {
       b.addEventListener("click", function () {
         state.layer = b.dataset.layer;
         $$(".lbtn").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        state.frame = FRAMES - 1;
+        renderMap();
+        var playbar = $(".playbar");
+        if (playbar) playbar.style.opacity = state.layer === "none" ? ".45" : "1";
+      });
+    });
+
+    $$("[data-view]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        state.view = b.dataset.view;
+        $$("[data-view]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        state.frame = FRAMES - 1;
         renderMap();
       });
     });
 
-    $("#scenePrev").addEventListener("click", function () { state.sceneOffset = clamp(state.sceneOffset + 1, 1, 6); renderMap(); });
-    $("#sceneNext").addEventListener("click", function () { state.sceneOffset = clamp(state.sceneOffset - 1, 1, 6); renderMap(); });
+    $$("[data-span]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        state.span = +b.dataset.span;
+        $$("[data-span]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        state.frame = FRAMES - 1;
+        renderMap();
+      });
+    });
+
+    $("#playBtn").addEventListener("click", function () {
+      if (state.playing) stopPlay(); else startPlay();
+    });
+    $("#scrub").addEventListener("input", function (e) {
+      stopPlay();
+      activateFrame(+e.target.value);
+    });
     $("#refreshBtn").addEventListener("click", function () { if (!state.busy) { state.nextTick = POLL_SECONDS; refresh(false); } });
     $("#themeBtn").addEventListener("click", function () {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
@@ -1250,6 +1495,7 @@
     document.documentElement.setAttribute("data-theme", theme);
 
     renderStatic();
+    renderBriefing();
     wire();
     wireTable();
     wireFeedback();

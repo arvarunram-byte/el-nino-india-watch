@@ -17,12 +17,24 @@ edited without touching code.
 | **ENSO state** | RONI gauge, Niño 3.4 / 1+2 departures, 2026 build-up, CPC outlook probabilities | NOAA CPC | weekly + monthly |
 | **Rainfall** | 19-station totals (now / today / 7 d / 30 d), IMD category, 92-day observed bars + 7-day forecast | Open-Meteo | 15-min model step |
 | **Heat** | Daily maxima, live feels-like, anomaly vs the past week, IMD threshold flags, 7-day forecast | Open-Meteo | 15-min model step |
-| **Satellite** | IMERG precipitation rate and MODIS land-surface temperature mosaics, scene stepper, clickable stations | NASA GIBS | 30-min granules / daily |
+| **Satellite** | India or **world** extent, an animated IMERG / MODIS loop with a scrubber, the four Niño boxes drawn on the globe, clickable stations | NASA GIBS | 30-min granules / daily |
 | **Climate change** | CMIP6 1961–2050 warming rate, anomaly vs 1961–90, projected 2046–50, rainfall change | Open-Meteo Climate | static archive |
 | **Pacific detail** | Official Niño-box departures + live 30-day SST curves for all four boxes | NOAA CPC + Open-Meteo Marine | weekly / hourly |
+| **Briefing** | Plain-language seasonal read-out in English plus eight Indian languages | written here, translated by Sarvam | static per ENSO update |
 | **Data** | Feed inventory, backend status, feedback form | — | — |
 
 Everything re-polls **every 60 seconds**.
+
+### The satellite loop
+
+The map is a time machine, not a single still. Twelve frames are pulled straight from NASA GIBS
+as timestamped granules — every 30 minutes for precipitation, every day for land-surface
+temperature — and played back in place. Precipitation systems visibly cross the Bay of Bengal,
+the Western Ghats and the equatorial Pacific; in world mode the four Niño monitoring boxes are
+drawn on the globe so you can see where the El Niño signal actually lives.
+
+Frames load lazily, two ahead of the playhead, so playback never stalls waiting for a tile. The
+loop ends a few hours behind now because that is where the satellite data actually is.
 
 ### On "real-time, every minute"
 
@@ -128,6 +140,9 @@ Static host, no build. On GitHub Pages, Netlify or Vercel: publish the repositor
 | `T` | Toggle dark / light |
 | `Esc` | Close the station drawer |
 
+The map has its own controls: an **India / World** extent switch, a play button, a frame scrubber
+and a 12 h / 24 h / 72 h loop span.
+
 Region filters and the station drawer are also linkable: `?region=south`.
 
 ---
@@ -137,6 +152,9 @@ Region filters and the station drawer are also linkable: `?region=south`.
 - **Open-Meteo** — weather, marine and CMIP6 climate APIs (CC-BY 4.0).
 - **NASA GIBS / IMERG / MODIS** — satellite imagery (NASA, public domain).
 - **NOAA Climate Prediction Center** — RONI, Niño departures, ENSO alert status and outlook.
+- **Sarvam** — translation of the briefing into Hindi, Bengali, Marathi, Gujarati, Tamil, Telugu,
+  Kannada and Malayalam. The English text is written for this console from the CPC record; the
+  translations say the same thing and carry the same caveat.
 - **India Meteorological Department** — heat-wave thresholds and 24-hour rainfall categories.
 
 Figures quoted in the interface are dated and attributed where they are shown. Nothing in this

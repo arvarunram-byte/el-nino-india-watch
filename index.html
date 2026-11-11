@@ -39,6 +39,7 @@
       <a href="#p-map">Satellite</a>
       <a href="#p-climate">Climate</a>
       <a href="#p-pacific">Pacific</a>
+      <a href="#p-brief">Briefing</a>
       <a href="#p-data">Data</a>
     </nav>
 
@@ -203,10 +204,9 @@
   <div class="panel__head">
     <div class="panel__title"><span class="idx">03</span><span class="dot dot--map"></span><h2>Satellite view — India &amp; surrounds</h2></div>
     <div class="panel__tools">
-      <div class="scene">
-        <button id="scenePrev" type="button" aria-label="Earlier scene">‹</button>
-        <span id="sceneDate" class="mono">—</span>
-        <button id="sceneNext" type="button" aria-label="Later scene">›</button>
+      <div class="seg" role="group" aria-label="Map extent">
+        <button type="button" data-view="india" aria-pressed="true">India</button>
+        <button type="button" data-view="world" aria-pressed="false">World</button>
       </div>
       <div class="layerbar" role="group" aria-label="Map layer">
         <button class="lbtn" data-layer="precip" aria-pressed="true" type="button">Precipitation</button>
@@ -217,8 +217,25 @@
   </div>
   <div class="panel__body panel__body--map">
     <div class="map-shell">
-      <div id="mapTiles"><svg id="mapSvg" aria-hidden="true"></svg></div>
+      <div id="mapTiles">
+        <div id="mapBase"></div>
+        <div id="mapFrames"></div>
+        <svg id="mapSvg" aria-hidden="true"></svg>
+      </div>
       <div class="map-hud mono" id="mapHud">—</div>
+    </div>
+    <div class="playbar">
+      <button class="play" id="playBtn" type="button" aria-label="Play satellite loop" aria-pressed="false">
+        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path id="playIcon" d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+      </button>
+      <input class="scrub" id="scrub" type="range" min="0" max="11" value="11" step="1" aria-label="Satellite loop frame">
+      <span class="stamp mono" id="frameStamp">—</span>
+      <div class="seg seg--sm" role="group" aria-label="Loop span">
+        <button type="button" data-span="12" aria-pressed="true">12 h</button>
+        <button type="button" data-span="24" aria-pressed="false">24 h</button>
+        <button type="button" data-span="72" aria-pressed="false">72 h</button>
+      </div>
+      <span class="loadstate mono" id="loadState"></span>
     </div>
     <div class="map-foot">
       <div class="legend" id="mapLegend"></div>
@@ -274,10 +291,26 @@
   </div>
 </section>
 
+<!-- ══ BRIEFING ═══════════════════════════════════════════════════════ -->
+<section class="panel panel--brief" id="p-brief">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">06</span><span class="dot dot--brief"></span><h2>Briefing</h2></div>
+    <div class="panel__meta">written &amp; translated by Sarvam</div>
+  </div>
+  <div class="panel__body">
+    <div class="langbar" id="langBar" role="group" aria-label="Briefing language"></div>
+    <blockquote class="brief" id="briefText" lang="en"></blockquote>
+    <div class="brief__foot">
+      <span id="briefAttrib">English · Sarvam</span>
+      <span class="mono" id="briefMeta">seasonal context, not a district forecast</span>
+    </div>
+  </div>
+</section>
+
 <!-- ══ DATA ═══════════════════════════════════════════════════════════ -->
 <section class="panel" id="p-data">
   <div class="panel__head">
-    <div class="panel__title"><span class="idx">06</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
+    <div class="panel__title"><span class="idx">07</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
     <div class="panel__meta" id="backendMeta">checking backend…</div>
   </div>
   <div class="panel__body">
@@ -364,6 +397,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="assets/data.js"></script>
+<script src="assets/briefing.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>
