@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENI · El Niño / India Climate Watch</title>
+<meta name="description" content="Live El Niño status, rainfall, heat and climate-change readings for India and its neighbourhood — satellite imagery, model feeds and NOAA indices in one console.">
+<meta name="theme-color" content="#090c10">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23090c10'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23d0533f' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23d0533f'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════ -->
+<header class="hdr" id="top">
+  <div class="hdr__in">
+    <a class="brand" href="#top" aria-label="ENI home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <circle cx="15" cy="15" r="13.4" stroke="rgba(208,83,63,.45)" stroke-width="1"/>
+        <circle cx="15" cy="15" r="7.6" stroke="rgba(63,169,184,.65)" stroke-width="1"/>
+        <path d="M15 1.6v5.2M15 23.2v5.2M1.6 15h5.2M23.2 15h5.2" stroke="rgba(233,228,218,.45)" stroke-width="1"/>
+        <circle cx="15" cy="15" r="2.6" fill="#d0533f"/>
+      </svg>
+      <span class="brand__txt">
+        <span class="brand__name">ENI</span>
+        <span class="brand__sub">El Niño / India watch</span>
+      </span>
+    </a>
+
+    <nav class="sectnav" id="sectNav" aria-label="Sections">
+      <a href="#p-enso">ENSO</a>
+      <a href="#p-rain">Rainfall</a>
+      <a href="#p-heat">Heat</a>
+      <a href="#p-map">Satellite</a>
+      <a href="#p-climate">Climate</a>
+      <a href="#p-pacific">Pacific</a>
+      <a href="#p-data">Data</a>
+    </nav>
+
+    <div class="hdr__tools">
+      <span class="clock" id="clock" aria-live="off">--:--:--</span>
+      <button class="tool" id="themeBtn" type="button" aria-label="Toggle colour theme" title="Toggle theme (T)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+      <span class="pill" id="syncPill"><span class="dot dot--live"></span><span id="lastSync">connecting</span></span>
+      <button class="ring" id="refreshBtn" type="button" aria-label="Refresh feeds now" title="Refresh now (R)">
+        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+          <circle cx="14" cy="14" r="11.6" fill="none" stroke="rgba(139,149,161,.22)" stroke-width="2"/>
+          <circle id="ringFg" cx="14" cy="14" r="11.6" fill="none" stroke="#3fa9b8" stroke-width="2" stroke-linecap="round" stroke-dasharray="72.88" stroke-dashoffset="0"/>
+        </svg>
+        <span id="countdown">60</span>
+      </button>
+      <span class="pill pill--alarm" id="statusPill" title="NOAA CPC ENSO Alert System Status"><span class="dot dot--live"></span>El Niño Advisory</span>
+    </div>
+  </div>
+
+  <div class="subbar">
+    <div class="subbar__in">
+      <div class="chips" id="regionChips" role="group" aria-label="Filter by region"></div>
+      <div class="subbar__right">
+        <span class="mono subbar__count" id="stationCount">— stations</span>
+        <button class="ghost" id="exportBtn" type="button" title="Download the station table as CSV">Export CSV</button>
+        <button class="ghost" id="shareBtn" type="button" title="Copy a link to this view">Share view</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ══ HERO · ENSO ════════════════════════════════════════════════════ -->
+<section class="hero" id="p-enso">
+  <div class="hero__grid">
+    <div class="hero__lead">
+      <div class="eyebrow"><span class="dot dot--enso"></span>ENSO state · <span id="heroIssued">NOAA CPC · 09 Nov 2026</span></div>
+      <h1 class="hero__title">Strong <em>El Niño</em><br>is running the Pacific</h1>
+      <p class="hero__dek">
+        Equatorial Pacific sea-surface temperatures are far above average and still climbing.
+        For India that is the classic drying-and-warming teleconnection: a suppressed
+        north-east monsoon and warm, dry anomalies across the peninsula and central belt.
+      </p>
+      <div class="hero__figs">
+        <div class="fig">
+          <div class="fig__k">RONI · <span id="roniPeriod">ASO 2026</span></div>
+          <div class="fig__v" id="heroRoni">+2.0<small>°C</small></div>
+          <div class="fig__s">3-month running mean</div>
+        </div>
+        <div class="fig">
+          <div class="fig__k">Niño 3.4 · weekly</div>
+          <div class="fig__v" id="heroN34">+2.3<small>°C</small></div>
+          <div class="fig__s">OISSTv2.1 departure</div>
+        </div>
+        <div class="fig">
+          <div class="fig__k">Niño 1+2 · weekly</div>
+          <div class="fig__v" id="heroN12">+4.7<small>°C</small></div>
+          <div class="fig__s">eastern Pacific</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero__dial">
+      <div class="dial">
+        <svg id="dialSvg" viewBox="0 0 300 176" role="img" aria-label="ENSO phase gauge"></svg>
+        <div class="dial__read">
+          <div class="dial__v" id="dialValue">+2.0</div>
+          <div class="dial__k">RONI °C</div>
+        </div>
+      </div>
+      <div class="dial__legend">
+        <span><i class="sw sw--lanina"></i>La Niña ≤ −0.5</span>
+        <span><i class="sw sw--neutral"></i>Neutral</span>
+        <span><i class="sw sw--elnino"></i>El Niño ≥ +0.5</span>
+      </div>
+    </div>
+
+    <div class="hero__side">
+      <div class="minih">
+        <span>Build-up through 2026</span>
+        <span class="mono">RONI, °C</span>
+      </div>
+      <div class="strip" id="roniStrip"></div>
+      <div class="outlook">
+        <div class="outlook__h">Outlook · CPC</div>
+        <p id="outlookText">A strong-to-very-strong event is likely through <b>Jan–Mar 2027</b>, with a
+        three-month RONI of +2.5 °C or more — stronger than any El Niño since 1950 — put at
+        <b>83%</b> for Oct–Dec. Source: NOAA CPC ENSO Diagnostic Discussion.</p>
+        <div class="probs" id="probs"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ALERTS ═════════════════════════════════════════════════════════ -->
+<section class="alerts" id="alerts" aria-label="Derived alerts" hidden>
+  <div class="alerts__h"><span class="dot dot--live"></span>Derived alerts</div>
+  <div class="alerts__list" id="alertList"></div>
+</section>
+
+<!-- ══ RAINFALL ═══════════════════════════════════════════════════════ -->
+<section class="panel" id="p-rain">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">01</span><span class="dot dot--rain"></span><h2>Rainfall</h2></div>
+    <div class="panel__meta" id="rainMeta">—</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Today · mean</div><div class="kpi__v" id="rainToday">—</div><div class="kpi__s">mm / 24 h</div></div>
+      <div class="kpi"><div class="kpi__k">Last 7 days</div><div class="kpi__v" id="rain7">—</div><div class="kpi__s">mm mean / station</div></div>
+      <div class="kpi"><div class="kpi__k">30d vs prior 30d</div><div class="kpi__v" id="rainAnom">—</div><div class="kpi__s" id="rainAnomS">in-record change</div></div>
+      <div class="kpi"><div class="kpi__k">Wettest today</div><div class="kpi__v kpi__v--sm" id="rainWet">—</div><div class="kpi__s" id="rainWetS">station</div></div>
+    </div>
+    <div class="chartblock">
+      <div class="minih"><span>Daily mean rainfall, 92 days observed + 7 forecast</span><span class="mono">mm</span></div>
+      <div class="bars" id="rainChart"></div>
+      <div class="axis"><span>92 days ago</span><span>Oct</span><span>Nov</span><span>+7 d</span></div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl" id="rainTable">
+        <thead>
+          <tr>
+            <th class="s-left">Station</th>
+            <th data-sort="now">Now</th>
+            <th data-sort="today">Today</th>
+            <th data-sort="p7">7 d</th>
+            <th data-sort="p30">30 d</th>
+            <th class="s-left">Category</th>
+          </tr>
+        </thead>
+        <tbody id="rainBody"><tr><td colspan="6" class="loading">Loading station data…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HEAT ═══════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-heat">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">02</span><span class="dot dot--heat"></span><h2>Heat</h2></div>
+    <div class="panel__meta" id="heatMeta">IMD absolute thresholds</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Hottest</div><div class="kpi__v kpi__v--sm" id="heatHot">—</div><div class="kpi__s" id="heatHotS">daily max</div></div>
+      <div class="kpi"><div class="kpi__k">Mean max</div><div class="kpi__v" id="heatMean">—</div><div class="kpi__s">°C today</div></div>
+      <div class="kpi"><div class="kpi__k">Peak feels-like</div><div class="kpi__v" id="heatFeels">—</div><div class="kpi__s">°C now</div></div>
+    </div>
+    <div class="hlist" id="heatList"><div class="loading">Loading station data…</div></div>
+    <div class="chartblock">
+      <div class="minih"><span id="heatFcLabel">7-day peak max</span><span class="mono">°C</span></div>
+      <svg class="linechart" id="heatForecast" viewBox="0 0 400 96" preserveAspectRatio="none" role="img" aria-label="Seven day maximum temperature forecast"></svg>
+      <div class="axis" id="heatFcAxis"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SATELLITE ══════════════════════════════════════════════════════ -->
+<section class="panel panel--map" id="p-map">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">03</span><span class="dot dot--map"></span><h2>Satellite view — India &amp; surrounds</h2></div>
+    <div class="panel__tools">
+      <div class="scene">
+        <button id="scenePrev" type="button" aria-label="Earlier scene">‹</button>
+        <span id="sceneDate" class="mono">—</span>
+        <button id="sceneNext" type="button" aria-label="Later scene">›</button>
+      </div>
+      <div class="layerbar" role="group" aria-label="Map layer">
+        <button class="lbtn" data-layer="precip" aria-pressed="true" type="button">Precipitation</button>
+        <button class="lbtn" data-layer="lst" aria-pressed="false" type="button">Land surface temp</button>
+        <button class="lbtn" data-layer="none" aria-pressed="false" type="button">Bare</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel__body panel__body--map">
+    <div class="map-shell">
+      <div id="mapTiles"><svg id="mapSvg" aria-hidden="true"></svg></div>
+      <div class="map-hud mono" id="mapHud">—</div>
+    </div>
+    <div class="map-foot">
+      <div class="legend" id="mapLegend"></div>
+      <div class="map-note" id="mapNote"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CLIMATE ════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-climate">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">04</span><span class="dot dot--climate"></span><h2>Climate change</h2></div>
+    <div class="panel__meta" id="climMeta">CMIP6 · central India · 1961–2050</div>
+  </div>
+  <div class="panel__body">
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__k">Warming rate</div><div class="kpi__v" id="climRate">—</div><div class="kpi__s">°C / decade</div></div>
+      <div class="kpi"><div class="kpi__k">2021–25 anomaly</div><div class="kpi__v" id="climAnom">—</div><div class="kpi__s" id="climAnomS">vs 1961–90</div></div>
+      <div class="kpi"><div class="kpi__k">2046–50 anomaly</div><div class="kpi__v" id="climProj">—</div><div class="kpi__s">projected</div></div>
+      <div class="kpi"><div class="kpi__k">Rain change 2046–50</div><div class="kpi__v" id="climRain">—</div><div class="kpi__s" id="climRainS">vs 1961–90</div></div>
+    </div>
+    <div class="chartblock">
+      <div class="minih"><span>Temperature anomaly · 5-year means</span><span class="mono">°C vs 1961–90</span></div>
+      <svg class="linechart linechart--tall" id="climChart" viewBox="0 0 700 200" preserveAspectRatio="none" role="img" aria-label="Modelled temperature anomaly for central India"></svg>
+      <div class="axis" id="climAxis"></div>
+    </div>
+    <div class="periods" id="climPeriods"></div>
+    <p class="footnote">
+      Downscaled CMIP6 output (MRI-AGCM3.2S, ~20 km) sampled at 22.0°N 79.0°E — the central India
+      landmass. Model climatology, not observations: it shows the forced trend, not any single year.
+    </p>
+  </div>
+</section>
+
+<!-- ══ PACIFIC ════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-pacific">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">05</span><span class="dot dot--enso"></span><h2>Pacific detail</h2></div>
+    <div class="panel__meta">weekly departures · °C</div>
+  </div>
+  <div class="panel__body">
+    <div class="ebars" id="ensoBars"></div>
+    <div class="chartblock">
+      <div class="minih"><span>Live SST · last 30 days</span><span class="mono">°C absolute</span></div>
+      <svg class="linechart" id="sstChart" viewBox="0 0 400 130" preserveAspectRatio="none" role="img" aria-label="Sea surface temperature in the Niño regions"></svg>
+      <div class="axis" id="sstAxis"></div>
+      <div class="sst-legend" id="sstLegend"></div>
+    </div>
+    <p class="footnote">
+      Departures are NOAA CPC weekly OISSTv2.1 anomalies. The curves are live model SST at each
+      Niño-box centre — absolute temperature, not anomaly.
+    </p>
+  </div>
+</section>
+
+<!-- ══ DATA ═══════════════════════════════════════════════════════════ -->
+<section class="panel" id="p-data">
+  <div class="panel__head">
+    <div class="panel__title"><span class="idx">06</span><span class="dot dot--dim"></span><h2>Feeds, backend &amp; honest limits</h2></div>
+    <div class="panel__meta" id="backendMeta">checking backend…</div>
+  </div>
+  <div class="panel__body">
+    <div class="tbl-wrap">
+      <table class="tbl tbl--src">
+        <thead><tr><th class="s-left">Feed</th><th class="s-left">What it gives</th><th class="s-left">Native cadence</th><th class="s-left">Endpoint</th></tr></thead>
+        <tbody>
+          <tr><td>Open-Meteo</td><td>Temperature, apparent temperature, humidity and rain for every station; 92-day history + 7-day forecast</td><td>15-min model step · page polls 60 s</td><td><code>api.open-meteo.com</code></td></tr>
+          <tr><td>NASA GIBS · IMERG</td><td>Satellite precipitation-rate mosaic on the map</td><td>30-min granules, ~6–12 h latency</td><td><code>gibs.earthdata.nasa.gov</code></td></tr>
+          <tr><td>NASA GIBS · MODIS</td><td>Daytime land-surface temperature composite</td><td>1 day, ~1–2 day latency</td><td><code>gibs.earthdata.nasa.gov</code></td></tr>
+          <tr><td>Open-Meteo Marine</td><td>Live sea-surface temperature at the four Niño-box centres</td><td>hourly model step</td><td><code>marine-api.open-meteo.com</code></td></tr>
+          <tr><td>Open-Meteo Climate</td><td>Downscaled CMIP6 daily series 1961–2050</td><td>static archive, cached 24 h</td><td><code>climate-api.open-meteo.com</code></td></tr>
+          <tr><td>NOAA CPC</td><td>RONI / Niño departures, ENSO alert status, outlook probabilities</td><td>weekly + monthly</td><td><code>cpc.ncep.noaa.gov</code></td></tr>
+          <tr><td>Supabase</td><td>Station register, IMD thresholds, ENSO record, observation archive, feedback</td><td>read at boot · snapshot write per session</td><td><code id="sbHost">—</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note note--wide">
+      <b>On “every minute”.</b> This console re-polls every 60 seconds and re-renders from whatever the
+      upstream feed has published. No public satellite product delivers a true one-minute India mosaic —
+      IMERG lands in 30-minute granules with several hours of latency and MODIS composites land daily.
+      The header clock is the page's poll, not the age of the pixels; each panel states its own freshness.
+    </div>
+
+    <div class="feedback">
+      <div class="feedback__h">
+        <h3>Tell the console what to watch</h3>
+        <p>Missing a station, a region, a threshold that matters to you? This writes straight to the
+        Supabase <code>eni_feedback</code> table.</p>
+      </div>
+      <form class="feedback__form" id="fbForm" novalidate>
+        <label class="field">
+          <span>Kind</span>
+          <select id="fbKind">
+            <option value="station">Add a station</option>
+            <option value="data">Data looks wrong</option>
+            <option value="feature">Feature request</option>
+            <option value="other">Something else</option>
+          </select>
+        </label>
+        <label class="field field--grow">
+          <span>Message</span>
+          <input id="fbMsg" type="text" maxlength="600" placeholder="e.g. add Kochi and Visakhapatnam" required>
+        </label>
+        <label class="field">
+          <span>Contact <em>(optional)</em></span>
+          <input id="fbContact" type="text" maxlength="120" placeholder="email or handle">
+        </label>
+        <button class="btn" id="fbSubmit" type="submit">Send</button>
+      </form>
+      <div class="feedback__status mono" id="fbStatus" role="status"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ STATION DRAWER ═════════════════════════════════════════════════ -->
+<aside class="drawer" id="drawer" hidden aria-label="Station detail">
+  <div class="drawer__scrim" id="drawerScrim"></div>
+  <div class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="drawer__head">
+      <div>
+        <div class="eyebrow" id="drawerRegion">station</div>
+        <h2 id="drawerTitle">—</h2>
+      </div>
+      <button class="tool" id="drawerClose" type="button" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer__body" id="drawerBody"></div>
+  </div>
+</aside>
+
+<footer class="foot">
+  <div class="foot__in">
+    <span>ENI · El Niño / India watch</span>
+    <span class="foot__mid">Open feeds · Supabase backend · <a id="repoLink" href="#" target="_blank" rel="noopener">source on GitHub</a></span>
+    <span class="mono" id="footStamp">—</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+test_*.html
+assets/app_test.js
+*.log
+.env
