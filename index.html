@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/styles.v11.css">
+<link rel="stylesheet" href="assets/styles.v14.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23090c10'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23d0533f' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23d0533f'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -488,6 +488,7 @@
         <label class="field field--grow">
           <span>Message</span>
           <input id="fbMsg" type="text" maxlength="600" placeholder="e.g. add Kochi and Visakhapatnam" required>
+          <input id="fbTrap" class="trap" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
         </label>
         <label class="field">
           <span>Contact <em>(optional)</em></span>
@@ -496,6 +497,16 @@
         <button class="btn" id="fbSubmit" type="submit">Send</button>
       </form>
       <div class="feedback__status mono" id="fbStatus" role="status"></div>
+    </div>
+
+    <div class="seclist">
+      <div class="seclist__h">Security — what is enforced on this page</div>
+      <div class="seclist__row"><b>Content-Security-Policy</b><span>Scripts run only from this origin. Network access is pinned to five hosts: Supabase, Open-Meteo (weather, flood, air, marine, climate, geocoding) and NASA GIBS. No other host can be reached even if code were injected.</span></div>
+      <div class="seclist__row"><b>Row-level security</b><span>Every table has RLS. Verified by switching Postgres into the <code>anon</code> role: reference tables read, the observation archive insert-only, and an anonymous write to the station register is rejected.</span></div>
+      <div class="seclist__row"><b>Write-only archive</b><span>The browser can append an observation but cannot read the archive back — an anonymous select returns zero rows.</span></div>
+      <div class="seclist__row"><b>Publishable key only</b><span>The key in this page is Supabase's publishable key, which is public by design. No service-role or secret key exists anywhere in the bundle.</span></div>
+      <div class="seclist__row"><b>Form guard</b><span>A hidden honeypot field, a 2.5-second timing trap and a 60-second rate limit sit in front of the only form that writes. Bots that fill every input are dropped silently.</span></div>
+      <div class="seclist__row"><b>No trackers</b><span>No analytics, no advertising pixels, no third-party cookies. Fonts are the only external asset, and they carry no identifier.</span></div>
     </div>
   </div>
 </section>
@@ -523,7 +534,7 @@
   <div class="foot__in">
     <span>ENI · India climate &amp; water watch</span>
     <span class="foot__mid">Open feeds · Supabase backend · <a id="repoLink" href="https://github.com/arvarunram-byte/el-nino-india-watch" target="_blank" rel="noopener">source on GitHub</a></span>
-    <span class="mono" id="footStamp">build v13</span>
+    <span class="mono" id="footStamp">build v14</span>
   </div>
 </footer>
 
@@ -540,6 +551,6 @@
 <script src="assets/districts.v13.js"></script>
 <script src="assets/briefing.v11.js"></script>
 <script src="assets/aliases.v11.js"></script>
-<script src="assets/app.v13.js"></script>
+<script src="assets/app.v14.js"></script>
 </body>
 </html>
