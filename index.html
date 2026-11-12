@@ -2,6 +2,8 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://gibs.earthdata.nasa.gov; connect-src 'self' https://*.supabase.co https://api.open-meteo.com https://flood-api.open-meteo.com https://air-quality-api.open-meteo.com https://marine-api.open-meteo.com https://climate-api.open-meteo.com https://geocoding-api.open-meteo.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ENI · India Climate &amp; Water Watch</title>
 <meta name="description" content="Live rainfall, heat, groundwater, river flow, wind and climate readings for every state and union territory of India — satellite imagery, model feeds and NOAA indices in one console.">
@@ -521,7 +523,7 @@
   <div class="foot__in">
     <span>ENI · India climate &amp; water watch</span>
     <span class="foot__mid">Open feeds · Supabase backend · <a id="repoLink" href="https://github.com/arvarunram-byte/el-nino-india-watch" target="_blank" rel="noopener">source on GitHub</a></span>
-    <span class="mono" id="footStamp">build v12</span>
+    <span class="mono" id="footStamp">build v13</span>
   </div>
 </footer>
 
@@ -535,8 +537,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="assets/data.v11.js"></script>
+<script src="assets/districts.v13.js"></script>
 <script src="assets/briefing.v11.js"></script>
 <script src="assets/aliases.v11.js"></script>
-<script src="assets/app.v12.js"></script>
+<script src="assets/app.v13.js"></script>
 </body>
 </html>
